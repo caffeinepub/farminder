@@ -29,6 +29,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  ChevronLeft,
+  ChevronRight,
   FlaskConical,
   List,
   Loader2,
@@ -1205,6 +1207,64 @@ function ViewSchedulesDialog({
     }
   };
 
+  const today = new Date();
+  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-indexed
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+
+  const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+  const monthFerts = fertSchedules.filter(
+    (s) =>
+      Number(s.scheduledDate.month) === viewMonth + 1 &&
+      Number(s.scheduledDate.year) === viewYear,
+  );
+  const monthSprays = spraySchedules.filter(
+    (s) =>
+      Number(s.scheduledDate.month) === viewMonth + 1 &&
+      Number(s.scheduledDate.year) === viewYear,
+  );
+
+  const fertsByDay: Record<number, typeof fertSchedules> = {};
+  const spraysByDay: Record<number, typeof spraySchedules> = {};
+  for (const f of monthFerts) {
+    const d = Number(f.scheduledDate.day);
+    if (!fertsByDay[d]) fertsByDay[d] = [];
+    fertsByDay[d].push(f);
+  }
+  for (const s of monthSprays) {
+    const d = Number(s.scheduledDate.day);
+    if (!spraysByDay[d]) spraysByDay[d] = [];
+    spraysByDay[d].push(s);
+  }
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const prevMonth = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear((y) => y - 1);
+    } else setViewMonth((m) => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear((y) => y + 1);
+    } else setViewMonth((m) => m + 1);
+  };
+
+  const sortedMonthFerts = [...monthFerts].sort(
+    (a, b) => Number(a.scheduledDate.day) - Number(b.scheduledDate.day),
+  );
+  const sortedMonthSprays = [...monthSprays].sort(
+    (a, b) => Number(a.scheduledDate.day) - Number(b.scheduledDate.day),
+  );
+
   return (
     <>
       <Dialog
@@ -1235,152 +1295,346 @@ function ViewSchedulesDialog({
             )}
           </DialogHeader>
 
-          <Tabs defaultValue="fertilizer" className="mt-2">
+          <Tabs defaultValue="monthly" className="mt-2">
             <TabsList className="w-full">
               <TabsTrigger
-                value="fertilizer"
+                value="monthly"
                 className="flex-1"
                 data-ocid="view_schedules.tab"
               >
-                <FlaskConical className="w-4 h-4 mr-1.5 text-green-600" />
-                Fertilizer ({fertSchedules.length})
+                Monthly View
               </TabsTrigger>
               <TabsTrigger
-                value="spray"
+                value="entries"
                 className="flex-1"
                 data-ocid="view_schedules.tab"
               >
-                <Wind className="w-4 h-4 mr-1.5 text-blue-600" />
-                Spray ({spraySchedules.length})
+                All Entries
               </TabsTrigger>
             </TabsList>
 
-            {/* Fertilizer Tab */}
-            <TabsContent value="fertilizer" className="mt-3">
-              {fertSchedules.length === 0 ? (
+            {/* Monthly View Tab */}
+            <TabsContent value="monthly" className="mt-3">
+              {/* Month navigation */}
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  type="button"
+                  onClick={prevMonth}
+                  data-ocid="view_schedules.pagination_prev"
+                  className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="font-semibold text-sm">
+                  {MONTHS[viewMonth]} {viewYear}
+                </span>
+                <button
+                  type="button"
+                  onClick={nextMonth}
+                  data-ocid="view_schedules.pagination_next"
+                  className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Legend */}
+              <div className="flex gap-3 mb-2">
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                  Fertilizer
+                </span>
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                  Spray
+                </span>
+              </div>
+
+              {/* Day headers */}
+              <div className="grid grid-cols-7 mb-1">
+                {DAYS_SHORT.map((d) => (
+                  <div
+                    key={d}
+                    className="text-center text-[10px] font-semibold text-muted-foreground py-0.5"
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar grid */}
+              <div className="grid grid-cols-7 gap-0.5 mb-4">
+                {cells.map((day, idx) => {
+                  const hasFert = day
+                    ? (fertsByDay[day]?.length ?? 0) > 0
+                    : false;
+                  const hasSpray = day
+                    ? (spraysByDay[day]?.length ?? 0) > 0
+                    : false;
+                  const isToday =
+                    day === today.getDate() &&
+                    viewMonth === today.getMonth() &&
+                    viewYear === today.getFullYear();
+                  return (
+                    <div
+                      key={day !== null ? `day-${day}` : `empty-${idx}`}
+                      className={[
+                        "flex flex-col items-center justify-start pt-1 pb-0.5 min-h-[40px] rounded-lg text-xs font-medium",
+                        day ? "text-foreground" : "opacity-0",
+                        isToday ? "border-2 border-primary text-primary" : "",
+                      ].join(" ")}
+                    >
+                      {day && <span>{day}</span>}
+                      {day && (
+                        <div className="flex gap-0.5 mt-0.5">
+                          {hasFert && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          )}
+                          {hasSpray && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Monthly schedule list */}
+              {sortedMonthFerts.length === 0 &&
+              sortedMonthSprays.length === 0 ? (
                 <div
-                  className="text-center py-10 text-muted-foreground"
+                  className="text-center py-6 text-muted-foreground text-sm"
                   data-ocid="view_schedules.empty_state"
                 >
-                  <FlaskConical className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">No fertilizer schedules added yet.</p>
+                  No schedules for {MONTHS[viewMonth]} {viewYear}.
                 </div>
               ) : (
-                <div className="flex flex-col gap-2">
-                  {fertSchedules.map((s, i) => {
-                    const { quantity, unit, notes } = parseNotes(s.notes);
-                    return (
-                      <div
-                        key={s.id.toString()}
-                        className="flex items-start gap-3 p-3 border border-border rounded-xl bg-green-50/50"
-                        data-ocid={`view_schedules.item.${i + 1}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm">
-                            {s.fertilizerName}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {formatDate(s.scheduledDate)}
-                          </p>
-                          {quantity && (
-                            <Badge className="mt-1 text-xs bg-green-100 text-green-700 border-green-200">
-                              {quantity} {unit}
-                            </Badge>
-                          )}
-                          {notes && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {notes}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setEditFertSchedule(s)}
-                            data-ocid={`view_schedules.edit_button.${i + 1}`}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-green-700 hover:bg-green-100 transition-colors"
-                            aria-label="Edit"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteFertId(s.id)}
-                            data-ocid={`view_schedules.delete_button.${i + 1}`}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors"
-                            aria-label="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                <div className="space-y-4">
+                  {sortedMonthFerts.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <FlaskConical className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="font-semibold text-xs text-emerald-700 uppercase tracking-wide">
+                          Fertilizer
+                        </span>
                       </div>
-                    );
-                  })}
+                      <div className="space-y-1.5">
+                        {sortedMonthFerts.map((s, i) => {
+                          const { quantity, unit } = parseNotes(s.notes);
+                          return (
+                            <div
+                              key={s.id.toString()}
+                              data-ocid={`view_schedules.item.${i + 1}`}
+                              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-100"
+                            >
+                              <span className="w-6 text-center text-xs font-bold text-emerald-700">
+                                {Number(s.scheduledDate.day)}
+                              </span>
+                              <span className="flex-1 text-sm font-medium text-foreground truncate">
+                                {s.fertilizerName}
+                              </span>
+                              {quantity && (
+                                <Badge className="text-[10px] px-1.5 py-0 bg-emerald-100 text-emerald-700 border-emerald-200">
+                                  {quantity} {unit}
+                                </Badge>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {sortedMonthSprays.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wind className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="font-semibold text-xs text-blue-700 uppercase tracking-wide">
+                          Spray
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {sortedMonthSprays.map((s, i) => {
+                          const { quantity, unit } = parseNotes(s.notes);
+                          return (
+                            <div
+                              key={s.id.toString()}
+                              data-ocid={`view_schedules.item.${sortedMonthFerts.length + i + 1}`}
+                              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-100"
+                            >
+                              <span className="w-6 text-center text-xs font-bold text-blue-700">
+                                {Number(s.scheduledDate.day)}
+                              </span>
+                              <span className="flex-1 text-sm font-medium text-foreground truncate">
+                                {s.sprayName}
+                              </span>
+                              {quantity && (
+                                <Badge className="text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 border-blue-200">
+                                  {quantity} {unit}
+                                </Badge>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </TabsContent>
 
-            {/* Spray Tab */}
-            <TabsContent value="spray" className="mt-3">
-              {spraySchedules.length === 0 ? (
-                <div
-                  className="text-center py-10 text-muted-foreground"
-                  data-ocid="view_schedules.empty_state"
-                >
-                  <Wind className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">No spray schedules added yet.</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {spraySchedules.map((s, i) => {
-                    const { quantity, unit, notes } = parseNotes(s.notes);
-                    return (
-                      <div
-                        key={s.id.toString()}
-                        className="flex items-start gap-3 p-3 border border-border rounded-xl bg-blue-50/50"
-                        data-ocid={`view_schedules.item.${i + 1}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm">{s.sprayName}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {formatDate(s.scheduledDate)}
-                          </p>
-                          {quantity && (
-                            <Badge className="mt-1 text-xs bg-blue-100 text-blue-700 border-blue-200">
-                              {quantity} {unit}
-                            </Badge>
-                          )}
-                          {notes && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {notes}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setEditSpraySchedule(s)}
-                            data-ocid={`view_schedules.edit_button.${i + 1}`}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-blue-700 hover:bg-blue-100 transition-colors"
-                            aria-label="Edit"
+            {/* All Entries Tab */}
+            <TabsContent value="entries" className="mt-3">
+              <Tabs defaultValue="fertilizer" className="mt-0">
+                <TabsList className="w-full">
+                  <TabsTrigger
+                    value="fertilizer"
+                    className="flex-1"
+                    data-ocid="view_schedules.tab"
+                  >
+                    <FlaskConical className="w-4 h-4 mr-1.5 text-green-600" />
+                    Fertilizer ({fertSchedules.length})
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="spray"
+                    className="flex-1"
+                    data-ocid="view_schedules.tab"
+                  >
+                    <Wind className="w-4 h-4 mr-1.5 text-blue-600" />
+                    Spray ({spraySchedules.length})
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="fertilizer" className="mt-3">
+                  {fertSchedules.length === 0 ? (
+                    <div
+                      className="text-center py-10 text-muted-foreground"
+                      data-ocid="view_schedules.empty_state"
+                    >
+                      <FlaskConical className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">
+                        No fertilizer schedules added yet.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {fertSchedules.map((s, i) => {
+                        const { quantity, unit, notes } = parseNotes(s.notes);
+                        return (
+                          <div
+                            key={s.id.toString()}
+                            className="flex items-start gap-3 p-3 border border-border rounded-xl bg-green-50/50"
+                            data-ocid={`view_schedules.item.${i + 1}`}
                           >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteSprayId(s.id)}
-                            data-ocid={`view_schedules.delete_button.${i + 1}`}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors"
-                            aria-label="Delete"
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm">
+                                {s.fertilizerName}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {formatDate(s.scheduledDate)}
+                              </p>
+                              {quantity && (
+                                <Badge className="mt-1 text-xs bg-green-100 text-green-700 border-green-200">
+                                  {quantity} {unit}
+                                </Badge>
+                              )}
+                              {notes && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {notes}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setEditFertSchedule(s)}
+                                data-ocid={`view_schedules.edit_button.${i + 1}`}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-green-700 hover:bg-green-100 transition-colors"
+                                aria-label="Edit"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteFertId(s.id)}
+                                data-ocid={`view_schedules.delete_button.${i + 1}`}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors"
+                                aria-label="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Spray Tab */}
+                <TabsContent value="spray" className="mt-3">
+                  {spraySchedules.length === 0 ? (
+                    <div
+                      className="text-center py-10 text-muted-foreground"
+                      data-ocid="view_schedules.empty_state"
+                    >
+                      <Wind className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">No spray schedules added yet.</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {spraySchedules.map((s, i) => {
+                        const { quantity, unit, notes } = parseNotes(s.notes);
+                        return (
+                          <div
+                            key={s.id.toString()}
+                            className="flex items-start gap-3 p-3 border border-border rounded-xl bg-blue-50/50"
+                            data-ocid={`view_schedules.item.${i + 1}`}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm">
+                                {s.sprayName}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {formatDate(s.scheduledDate)}
+                              </p>
+                              {quantity && (
+                                <Badge className="mt-1 text-xs bg-blue-100 text-blue-700 border-blue-200">
+                                  {quantity} {unit}
+                                </Badge>
+                              )}
+                              {notes && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {notes}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setEditSpraySchedule(s)}
+                                data-ocid={`view_schedules.edit_button.${i + 1}`}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-blue-700 hover:bg-blue-100 transition-colors"
+                                aria-label="Edit"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteSprayId(s.id)}
+                                data-ocid={`view_schedules.delete_button.${i + 1}`}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors"
+                                aria-label="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </TabsContent>
           </Tabs>
         </DialogContent>
