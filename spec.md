@@ -1,24 +1,23 @@
 # Farminder
 
 ## Current State
-Backend uses non-stable in-memory Maps for crops, fertilizer schedules, spray schedules, and user profiles. All counters (nextCropId, nextFertilizerScheduleId, nextSprayScheduleId) are also non-stable. This means every canister upgrade (every deployment) wipes all user data — the root cause of schedules disappearing.
+Calendar page fetches all fertilizer and spray schedules. When clicking a date in the month view, it shows tasks but only displays the crop name — no plot name is shown. The detail panel is conditionally rendered only when tasks exist on the selected day, but shows "No tasks" when there are none.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Stable storage arrays for all data (crops, fertilizer schedules, spray schedules, user profiles, and ID counters)
-- `preupgrade` system hook to serialize in-memory Maps to stable arrays
-- `postupgrade` system hook to restore in-memory Maps from stable arrays on canister start
+- Plot name displayed alongside crop name in the day detail panel for each fertilizer/spray task
+- Plot-wise grouping in the day detail popup: group tasks by plot name so user can see which plot had which fertilizer or spray
 
 ### Modify
-- Convert `var nextCropId`, `var nextFertilizerScheduleId`, `var nextSprayScheduleId` to `stable var`
-- Add stable backing vars for all four Maps
+- Day detail panel: add plot name info to each task row (or group by plot)
+- Ensure the calendar shows dots for past dates as well as future (no filtering by current date — already done, just confirm)
+- cropMap should also store plotName: create plotNameMap from cropId -> plotName
 
 ### Remove
 - Nothing removed
 
 ## Implementation Plan
-1. Add `stable var` arrays for each data store (crops, fertSchedules, spraySchedules, profiles) as `[(Principal, [T])]`
-2. Add `stable var` for ID counters
-3. Add `system func preupgrade()` that copies Maps → stable arrays
-4. Add `system func postupgrade()` that restores Maps from stable arrays
+1. Build `plotNameMap` (cropId -> plotName) from crops data alongside existing `cropMap`
+2. In the day detail panel, for each fertilizer/spray task row, show plot name as a subtitle below crop name
+3. Optionally group tasks by plot name for clearer plot-wise view

@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Droplets,
   Leaf,
+  MapPin,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
@@ -76,7 +77,6 @@ function MiniMonthCard({
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  // Build day sets for dots
   const fertDays = new Set<number>();
   const sprayDays = new Set<number>();
   for (const f of fertilizers) {
@@ -119,18 +119,16 @@ function MiniMonthCard({
       >
         {MONTHS[month]}
       </div>
-      {/* Day headers */}
       <div className="grid grid-cols-7 mb-1">
-        {DAYS_SHORT.map((d) => (
+        {DAYS_SHORT.map((d, i) => (
           <div
-            key={`day-header-${d}`}
+            key={`day-header-${MONTHS[month]}-${i}`}
             className="text-center text-[8px] font-medium text-muted-foreground"
           >
             {d}
           </div>
         ))}
       </div>
-      {/* Day grid */}
       <div className="grid grid-cols-7 gap-px">
         {cells.map((day, idx) => {
           const hasFert = day ? fertDays.has(day) : false;
@@ -166,6 +164,67 @@ function MiniMonthCard({
   );
 }
 
+// Grouped plot-wise task section
+function PlotTaskGroup({
+  plotName,
+  tasks,
+  type,
+  cropMap,
+  baseIndex,
+}: {
+  plotName: string;
+  tasks: Array<{
+    id: bigint;
+    fertilizerName?: string;
+    sprayName?: string;
+    cropId: bigint;
+    notes: string;
+  }>;
+  type: "fertilizer" | "spray";
+  cropMap: Record<string, string>;
+  baseIndex: number;
+}) {
+  const bgClass =
+    type === "fertilizer"
+      ? "bg-emerald-50 border-emerald-100"
+      : "bg-blue-50 border-blue-100";
+  const badgeClass =
+    type === "fertilizer"
+      ? "bg-emerald-500 text-white"
+      : "bg-blue-500 text-white";
+
+  return (
+    <div className="mb-3">
+      <div className="flex items-center gap-1.5 mb-2 px-1">
+        <MapPin className="w-3 h-3 text-muted-foreground" />
+        <span className="text-xs font-bold text-foreground">{plotName}</span>
+      </div>
+      <div className="space-y-1.5 pl-4">
+        {tasks.map((task, i) => {
+          const qty = extractQty(task.notes);
+          const name =
+            type === "fertilizer" ? task.fertilizerName! : task.sprayName!;
+          return (
+            <div
+              key={String(task.id)}
+              data-ocid={`calendar.row.${baseIndex + i + 1}`}
+              className={`flex items-center justify-between rounded-xl px-3 py-2.5 border ${bgClass}`}
+            >
+              <div>
+                <p className="font-medium text-sm text-foreground">{name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {cropMap[String(task.cropId)] ?? "Unknown Crop"}
+                </p>
+              </div>
+              {qty && <Badge className={`text-xs ${badgeClass}`}>{qty}</Badge>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function CalendarPage() {
   const today = new Date();
   const [viewMode, setViewMode] = useState<ViewMode>("year");
@@ -181,12 +240,16 @@ export default function CalendarPage() {
 
   const isLoading = cropsLoading || fertLoading || sprayLoading;
 
+  // cropId -> crop name
   const cropMap: Record<string, string> = {};
+  // cropId -> plot name
+  const plotNameMap: Record<string, string> = {};
   for (const c of crops) {
     cropMap[String(c.id)] = c.name;
+    plotNameMap[String(c.id)] = c.plotName || c.name;
   }
 
-  // Filter schedules for current viewMonth/viewYear (for detailed month view)
+  // Filter schedules for current viewMonth/viewYear
   const monthFerts = fertilizers.filter(
     (f) =>
       Number(f.scheduledDate.month) === viewMonth + 1 &&
@@ -198,7 +261,7 @@ export default function CalendarPage() {
       Number(s.scheduledDate.year) === viewYear,
   );
 
-  // Build day -> tasks map for detailed month view
+  // Build day -> tasks map
   const fertsByDay: Record<number, typeof fertilizers> = {};
   const spraysByDay: Record<number, typeof sprays> = {};
   for (const f of monthFerts) {
@@ -246,6 +309,22 @@ export default function CalendarPage() {
     setViewMode("month");
   };
 
+  // Group by plot name
+  function groupByPlot<T extends { cropId: bigint }>(
+    items: T[],
+  ): Record<string, T[]> {
+    const groups: Record<string, T[]> = {};
+    for (const item of items) {
+      const plotName = plotNameMap[String(item.cropId)] || "Unknown Plot";
+      if (!groups[plotName]) groups[plotName] = [];
+      groups[plotName].push(item);
+    }
+    return groups;
+  }
+
+  const fertsByPlot = groupByPlot(selectedFerts);
+  const spraysByPlot = groupByPlot(selectedSprays);
+
   return (
     <main className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Header */}
@@ -258,7 +337,7 @@ export default function CalendarPage() {
             Farm Calendar
           </h1>
           <p className="text-muted-foreground text-sm">
-            View upcoming fertilizer &amp; spray schedules
+            View fertilizer &amp; spray schedules by plot
           </p>
         </div>
       </div>
@@ -471,112 +550,98 @@ export default function CalendarPage() {
 
           {/* Day detail panel */}
           <AnimatePresence>
-            {selectedDay !== null &&
-              (selectedFerts.length > 0 || selectedSprays.length > 0) && (
-                <motion.div
-                  key={selectedDay}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  transition={{ duration: 0.2 }}
-                  className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-sm"
-                  data-ocid="calendar.panel"
-                >
-                  <h3 className="font-display font-bold text-lg mb-4">
-                    {MONTHS[viewMonth]} {selectedDay}, {viewYear}
-                  </h3>
+            {selectedDay !== null && (
+              <motion.div
+                key={selectedDay}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.2 }}
+                className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-sm"
+                data-ocid="calendar.panel"
+              >
+                <h3 className="font-display font-bold text-lg mb-1">
+                  {MONTHS[viewMonth]} {selectedDay}, {viewYear}
+                </h3>
 
-                  {selectedFerts.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Leaf className="w-4 h-4 text-emerald-600" />
-                        <span className="font-semibold text-sm text-emerald-700">
-                          Fertilizer Tasks
-                        </span>
+                {selectedFerts.length === 0 && selectedSprays.length === 0 ? (
+                  <p
+                    className="text-muted-foreground text-sm py-4 text-center"
+                    data-ocid="calendar.empty_state"
+                  >
+                    No tasks scheduled for this day.
+                  </p>
+                ) : (
+                  <>
+                    {selectedFerts.length > 0 && (
+                      <div className="mb-5">
+                        <div className="flex items-center gap-2 mb-3 mt-3">
+                          <Leaf className="w-4 h-4 text-emerald-600" />
+                          <span className="font-semibold text-sm text-emerald-700">
+                            Fertilizer Tasks
+                          </span>
+                          <Badge variant="outline" className="text-xs ml-auto">
+                            {selectedFerts.length} task
+                            {selectedFerts.length !== 1 ? "s" : ""}
+                          </Badge>
+                        </div>
+                        {Object.entries(fertsByPlot).map(
+                          ([plotName, tasks], gi) => {
+                            const baseIndex = Object.values(fertsByPlot)
+                              .slice(0, gi)
+                              .reduce((acc, g) => acc + g.length, 0);
+                            return (
+                              <PlotTaskGroup
+                                key={plotName}
+                                plotName={plotName}
+                                tasks={tasks as any}
+                                type="fertilizer"
+                                cropMap={cropMap}
+                                baseIndex={baseIndex}
+                              />
+                            );
+                          },
+                        )}
                       </div>
-                      <div className="space-y-2">
-                        {selectedFerts.map((f, i) => {
-                          const qty = extractQty(f.notes);
-                          return (
-                            <div
-                              key={String(f.id)}
-                              data-ocid={`calendar.row.${i + 1}`}
-                              className="flex items-center justify-between rounded-xl bg-emerald-50 px-4 py-3 border border-emerald-100"
-                            >
-                              <div>
-                                <p className="font-medium text-sm text-foreground">
-                                  {f.fertilizerName}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {cropMap[String(f.cropId)] ?? "Unknown Crop"}
-                                </p>
-                              </div>
-                              {qty && (
-                                <Badge className="bg-emerald-500 text-white text-xs">
-                                  {qty}
-                                </Badge>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {selectedSprays.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Droplets className="w-4 h-4 text-blue-600" />
-                        <span className="font-semibold text-sm text-blue-700">
-                          Spray Tasks
-                        </span>
+                    {selectedSprays.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Droplets className="w-4 h-4 text-blue-600" />
+                          <span className="font-semibold text-sm text-blue-700">
+                            Spray Tasks
+                          </span>
+                          <Badge variant="outline" className="text-xs ml-auto">
+                            {selectedSprays.length} task
+                            {selectedSprays.length !== 1 ? "s" : ""}
+                          </Badge>
+                        </div>
+                        {Object.entries(spraysByPlot).map(
+                          ([plotName, tasks], gi) => {
+                            const baseIndex =
+                              selectedFerts.length +
+                              Object.values(spraysByPlot)
+                                .slice(0, gi)
+                                .reduce((acc, g) => acc + g.length, 0);
+                            return (
+                              <PlotTaskGroup
+                                key={plotName}
+                                plotName={plotName}
+                                tasks={tasks as any}
+                                type="spray"
+                                cropMap={cropMap}
+                                baseIndex={baseIndex}
+                              />
+                            );
+                          },
+                        )}
                       </div>
-                      <div className="space-y-2">
-                        {selectedSprays.map((s, i) => {
-                          const qty = extractQty(s.notes);
-                          return (
-                            <div
-                              key={String(s.id)}
-                              data-ocid={`calendar.row.${
-                                selectedFerts.length + i + 1
-                              }`}
-                              className="flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3 border border-blue-100"
-                            >
-                              <div>
-                                <p className="font-medium text-sm text-foreground">
-                                  {s.sprayName}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {cropMap[String(s.cropId)] ?? "Unknown Crop"}
-                                </p>
-                              </div>
-                              {qty && (
-                                <Badge className="bg-blue-500 text-white text-xs">
-                                  {qty}
-                                </Badge>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            {selectedDay !== null &&
-              selectedFerts.length === 0 &&
-              selectedSprays.length === 0 && (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="mt-6 rounded-2xl border border-border bg-card p-5 text-center text-muted-foreground text-sm"
-                  data-ocid="calendar.empty_state"
-                >
-                  No tasks scheduled for {MONTHS[viewMonth]} {selectedDay}.
-                </motion.div>
-              )}
+                    )}
+                  </>
+                )}
+              </motion.div>
+            )}
           </AnimatePresence>
         </>
       )}
