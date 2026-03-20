@@ -1,21 +1,20 @@
 # Farminder
 
 ## Current State
-The app has full crop and plot management. Crops can be edited via pencil icon (added in Version 19). Plots can be deleted but cannot be edited (only the plot name is stored as a field on the Crop). The backend has `updateCrop` which can update name, cropType, and plotName.
+The app has a `checkUserPermission` function in the backend that calls `AccessControl.hasPermission`, which in turn calls `getUserRole`. If a user is not registered in the access control state (e.g., after a canister upgrade clears non-stable state, or if `_initializeAccessControlWithSecret` didn't complete), `getUserRole` traps with "User is not registered". This causes all data operations (addCrop, addPlot, addFertilizerSchedule, etc.) to fail with an error caught on the frontend as "Failed to add crop/plot".
 
 ## Requested Changes (Diff)
 
 ### Add
-- Edit plot functionality: pencil icon on each plot card in PlotsPage allowing the user to rename the plot (plotName field on crop)
+- Auto-registration logic for authenticated (non-anonymous) users
 
 ### Modify
-- PlotsPage: add edit button (pencil icon) to each plot card that opens a dialog to edit the plot name
+- `access-control.mo`: `getUserRole` should return `#user` for unregistered but authenticated (non-anonymous) principals instead of trapping — this makes any logged-in user able to use the app without needing explicit registration
+- `main.mo`: `checkUserPermission` should reject anonymous callers directly, without relying on the access control registration state
 
 ### Remove
 - Nothing
 
 ## Implementation Plan
-1. In PlotsPage, add a pencil icon button on each plot card header alongside the existing delete button
-2. Add an edit dialog/modal that lets the user update the plot name
-3. On save, call `updateCrop` with the updated plotName (keeping cropId, name, cropType the same)
-4. Refresh the crop list after update
+1. Update `getUserRole` in `access-control.mo` to return `#user` for unregistered non-anonymous principals
+2. Update `checkUserPermission` in `main.mo` to first reject anonymous callers, then delegate to permission check

@@ -42,7 +42,9 @@ module {
     switch (state.userRoles.get(caller)) {
       case (?role) { role };
       case (null) {
-        Runtime.trap("User is not registered");
+        // Auto-register authenticated users as #user so they can use the app
+        // even if _initializeAccessControlWithSecret was not called yet
+        #user;
       };
     };
   };

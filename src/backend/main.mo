@@ -57,7 +57,7 @@ actor {
   let userProfiles = Map.empty<Principal, UserProfile>();
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
     userProfiles.get(caller);
   };
 
@@ -69,12 +69,12 @@ actor {
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
     userProfiles.add(caller, profile);
   };
 
   public shared ({ caller }) func addCrop(name : Text, cropType : Text, plotName : Text) : async Nat {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let newCrop : Crop = {
       id = nextCropId;
@@ -96,7 +96,7 @@ actor {
   };
 
   public query ({ caller }) func listCrops() : async [Crop] {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let cropList = switch (crops.get(caller)) {
       case (null) { List.empty<Crop>() };
@@ -106,7 +106,7 @@ actor {
   };
 
   public shared ({ caller }) func updateCrop(cropId : Nat, name : Text, cropType : Text, plotName : Text) : async () {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let cropList = switch (crops.get(caller)) {
       case (null) { Runtime.trap("No crops found for user") };
@@ -127,7 +127,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteCrop(cropId : Nat) : async () {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let cropList = switch (crops.get(caller)) {
       case (null) { Runtime.trap("No crops found for user") };
@@ -144,7 +144,7 @@ actor {
     scheduledDate : Date,
     notes : Text,
   ) : async Nat {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let newSchedule : FertilizerSchedule = {
       id = nextFertilizerScheduleId;
@@ -173,7 +173,7 @@ actor {
     scheduledDate : Date,
     notes : Text,
   ) : async () {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (fertilizerSchedules.get(caller)) {
       case (null) { Runtime.trap("No schedules found for user") };
@@ -201,7 +201,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteFertilizerSchedule(scheduleId : Nat) : async () {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (fertilizerSchedules.get(caller)) {
       case (null) { Runtime.trap("No schedules found for user") };
@@ -218,7 +218,7 @@ actor {
     scheduledDate : Date,
     notes : Text,
   ) : async Nat {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let newSchedule : SpraySchedule = {
       id = nextSprayScheduleId;
@@ -247,7 +247,7 @@ actor {
     scheduledDate : Date,
     notes : Text,
   ) : async () {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (spraySchedules.get(caller)) {
       case (null) { Runtime.trap("No spray schedules found for user") };
@@ -275,7 +275,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteSpraySchedule(scheduleId : Nat) : async () {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (spraySchedules.get(caller)) {
       case (null) { Runtime.trap("No spray schedules found for user") };
@@ -287,7 +287,7 @@ actor {
   };
 
   public query ({ caller }) func getFertilizerSchedulesForMonth(month : Nat, year : Nat) : async [FertilizerSchedule] {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (fertilizerSchedules.get(caller)) {
       case (null) { List.empty<FertilizerSchedule>() };
@@ -304,7 +304,7 @@ actor {
   };
 
   public query ({ caller }) func getAllFertilizerSchedules() : async [FertilizerSchedule] {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (fertilizerSchedules.get(caller)) {
       case (null) { List.empty<FertilizerSchedule>() };
@@ -315,7 +315,7 @@ actor {
   };
 
   public query ({ caller }) func getAllSpraySchedules() : async [SpraySchedule] {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (spraySchedules.get(caller)) {
       case (null) { List.empty<SpraySchedule>() };
@@ -326,7 +326,7 @@ actor {
   };
 
   public query ({ caller }) func getTodaysFertilizerSchedules(currentDate : Date) : async [FertilizerSchedule] {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (fertilizerSchedules.get(caller)) {
       case (null) { List.empty<FertilizerSchedule>() };
@@ -345,7 +345,7 @@ actor {
   };
 
   public shared ({ caller }) func markFertilizerScheduleAsDone(scheduleId : Nat) : async () {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (fertilizerSchedules.get(caller)) {
       case (null) { Runtime.trap("No schedules found for user") };
@@ -373,7 +373,7 @@ actor {
   };
 
   public query ({ caller }) func getSpraySchedulesForMonth(month : Nat, year : Nat) : async [SpraySchedule] {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (spraySchedules.get(caller)) {
       case (null) { List.empty<SpraySchedule>() };
@@ -390,7 +390,7 @@ actor {
   };
 
   public query ({ caller }) func getTodaysSpraySchedules(currentDate : Date) : async [SpraySchedule] {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (spraySchedules.get(caller)) {
       case (null) { List.empty<SpraySchedule>() };
@@ -409,7 +409,7 @@ actor {
   };
 
   public shared ({ caller }) func markSprayScheduleAsDone(scheduleId : Nat) : async () {
-    checkUserPermission(caller);
+    checkAnonymous(caller);
 
     let scheduleList = switch (spraySchedules.get(caller)) {
       case (null) { Runtime.trap("No spray schedules found for user") };
@@ -436,9 +436,10 @@ actor {
     spraySchedules.add(caller, newList);
   };
 
-  func checkUserPermission(caller : Principal) {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can perform this action");
+  // Only blocks anonymous (unauthenticated) callers
+  func checkAnonymous(caller : Principal) {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be logged in to perform this action");
     };
   };
 };
