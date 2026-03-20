@@ -1,29 +1,25 @@
 # Farminder
 
 ## Current State
-The app has Dashboard, My Crops, and Plots sections. The backend has `getAllFertilizerSchedules` and `getAllSpraySchedules` APIs. The frontend has matching hooks (`useGetAllFertilizerSchedules`, `useGetAllSpraySchedules`) but no Calendar page yet.
+CropsPage allows adding and deleting crops. No edit functionality exists for crops.
 
 ## Requested Changes (Diff)
 
 ### Add
-- A new Calendar page (`/calendar`) that displays upcoming fertilizer and spray tasks in a monthly calendar view
-- Calendar navigation to switch between months
-- Each day cell shows colored dots/badges for fertilizer (green) and spray (blue) tasks
-- Clicking a day shows a detail list of tasks for that day
-- "Calendar" link added to the header navigation
-- CalendarRoute added to App.tsx router
+- `updateCrop(cropId, name, cropType, plotName)` backend function
+- `useUpdateCrop` hook in useQueries.ts
+- Edit button (pencil icon) on each crop card in CropsPage
+- Edit dialog/modal to change crop name, type, and plot name
 
 ### Modify
-- Header NAV_LINKS: add Calendar entry with CalendarDays icon
-- App.tsx: add calendarRoute
+- CropsPage.tsx: add edit state, edit dialog, pencil icon button next to trash icon
+- useQueries.ts: add useUpdateCrop mutation
+- main.mo: add updateCrop function
 
 ### Remove
 - Nothing
 
 ## Implementation Plan
-1. Create `src/frontend/src/pages/CalendarPage.tsx` using `useGetAllFertilizerSchedules` and `useGetAllSpraySchedules` hooks
-2. Calendar renders a monthly grid; each day with tasks shows colored indicators
-3. Clicking a day opens a detail panel listing tasks for that day
-4. Add month prev/next navigation
-5. Add `/calendar` route in App.tsx
-6. Add Calendar nav link in Header.tsx
+1. Add updateCrop to main.mo
+2. Add useUpdateCrop hook to useQueries.ts
+3. Update CropsPage.tsx with edit dialog and pencil icon

@@ -105,6 +105,27 @@ actor {
     cropList.toArray();
   };
 
+  public shared ({ caller }) func updateCrop(cropId : Nat, name : Text, cropType : Text, plotName : Text) : async () {
+    checkUserPermission(caller);
+
+    let cropList = switch (crops.get(caller)) {
+      case (null) { Runtime.trap("No crops found for user") };
+      case (?list) { list };
+    };
+
+    let newList = cropList.map<Crop, Crop>(
+      func(crop) {
+        if (crop.id == cropId) {
+          { id = crop.id; name; cropType; plotName };
+        } else {
+          crop;
+        };
+      }
+    );
+
+    crops.add(caller, newList);
+  };
+
   public shared ({ caller }) func deleteCrop(cropId : Nat) : async () {
     checkUserPermission(caller);
 

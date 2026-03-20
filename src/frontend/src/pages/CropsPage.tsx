@@ -11,6 +11,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,11 +28,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2, MapPin, Plus, Sprout, Trash2 } from "lucide-react";
+import { Loader2, MapPin, Pencil, Plus, Sprout, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useAddCrop, useDeleteCrop, useListCrops } from "../hooks/useQueries";
+import type { Crop } from "../backend.d";
+import {
+  useAddCrop,
+  useDeleteCrop,
+  useListCrops,
+  useUpdateCrop,
+} from "../hooks/useQueries";
 
 const CROP_TYPES = [
   "Wheat",
@@ -41,12 +54,19 @@ const CROP_TYPES = [
 export default function CropsPage() {
   const { data: crops, isLoading } = useListCrops();
   const { mutateAsync: addCrop, isPending: adding } = useAddCrop();
+  const { mutateAsync: updateCrop, isPending: updating } = useUpdateCrop();
   const { mutateAsync: deleteCrop, isPending: deleting } = useDeleteCrop();
 
   const [name, setName] = useState("");
   const [cropType, setCropType] = useState("");
   const [plotName, setPlotName] = useState("");
   const [deleteId, setDeleteId] = useState<bigint | null>(null);
+
+  // Edit state
+  const [editCrop, setEditCrop] = useState<Crop | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCropType, setEditCropType] = useState("");
+  const [editPlotName, setEditPlotName] = useState("");
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +79,30 @@ export default function CropsPage() {
       toast.success(`${name.trim()} added!`);
     } catch {
       toast.error("Failed to add crop");
+    }
+  };
+
+  const openEdit = (crop: Crop) => {
+    setEditCrop(crop);
+    setEditName(crop.name);
+    setEditCropType(crop.cropType);
+    setEditPlotName(crop.plotName);
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCrop || !editName.trim() || !editCropType) return;
+    try {
+      await updateCrop({
+        cropId: editCrop.id,
+        name: editName.trim(),
+        cropType: editCropType,
+        plotName: editPlotName.trim(),
+      });
+      toast.success("Crop updated!");
+      setEditCrop(null);
+    } catch {
+      toast.error("Failed to update crop");
     }
   };
 
@@ -204,15 +248,26 @@ export default function CropsPage() {
                           )}
                         </div>
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        data-ocid={`crops.delete_button.${i + 1}`}
-                        onClick={() => setDeleteId(crop.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          data-ocid={`crops.edit_button.${i + 1}`}
+                          onClick={() => openEdit(crop)}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          data-ocid={`crops.delete_button.${i + 1}`}
+                          onClick={() => setDeleteId(crop.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </motion.div>
                   ))}
                 </AnimatePresence>
@@ -221,6 +276,68 @@ export default function CropsPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editCrop} onOpenChange={(o) => !o && setEditCrop(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Crop</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEdit} className="flex flex-col gap-4 mt-2">
+            <div>
+              <Label htmlFor="edit-crop-name">Crop Name</Label>
+              <Input
+                id="edit-crop-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="e.g. Summer Wheat"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-crop-type">Crop Type</Label>
+              <Select value={editCropType} onValueChange={setEditCropType}>
+                <SelectTrigger id="edit-crop-type">
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {CROP_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="edit-plot-name">Plot Name</Label>
+              <Input
+                id="edit-plot-name"
+                value={editPlotName}
+                onChange={(e) => setEditPlotName(e.target.value)}
+                placeholder="e.g. Plot A, North Field"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditCrop(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={updating || !editName.trim() || !editCropType}
+              >
+                {updating ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={!!deleteId}

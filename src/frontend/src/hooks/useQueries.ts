@@ -68,6 +68,33 @@ export function useAddCrop() {
   });
 }
 
+export function useUpdateCrop() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      cropId,
+      name,
+      cropType,
+      plotName,
+    }: {
+      cropId: bigint;
+      name: string;
+      cropType: string;
+      plotName: string;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).updateCrop(
+        cropId,
+        name,
+        cropType,
+        plotName,
+      ) as Promise<void>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["crops"] }),
+  });
+}
+
 export function useDeleteCrop() {
   const { actor } = useActor();
   const qc = useQueryClient();
