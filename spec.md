@@ -1,25 +1,21 @@
 # Farminder
 
 ## Current State
-CropsPage allows adding and deleting crops. No edit functionality exists for crops.
+The app has full crop and plot management. Crops can be edited via pencil icon (added in Version 19). Plots can be deleted but cannot be edited (only the plot name is stored as a field on the Crop). The backend has `updateCrop` which can update name, cropType, and plotName.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `updateCrop(cropId, name, cropType, plotName)` backend function
-- `useUpdateCrop` hook in useQueries.ts
-- Edit button (pencil icon) on each crop card in CropsPage
-- Edit dialog/modal to change crop name, type, and plot name
+- Edit plot functionality: pencil icon on each plot card in PlotsPage allowing the user to rename the plot (plotName field on crop)
 
 ### Modify
-- CropsPage.tsx: add edit state, edit dialog, pencil icon button next to trash icon
-- useQueries.ts: add useUpdateCrop mutation
-- main.mo: add updateCrop function
+- PlotsPage: add edit button (pencil icon) to each plot card that opens a dialog to edit the plot name
 
 ### Remove
 - Nothing
 
 ## Implementation Plan
-1. Add updateCrop to main.mo
-2. Add useUpdateCrop hook to useQueries.ts
-3. Update CropsPage.tsx with edit dialog and pencil icon
+1. In PlotsPage, add a pencil icon button on each plot card header alongside the existing delete button
+2. Add an edit dialog/modal that lets the user update the plot name
+3. On save, call `updateCrop` with the updated plotName (keeping cropId, name, cropType the same)
+4. Refresh the crop list after update

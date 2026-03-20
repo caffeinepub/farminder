@@ -60,6 +60,7 @@ import {
   useGetFertilizerSchedulesForMonth,
   useGetSpraySchedulesForMonth,
   useListCrops,
+  useUpdateCrop,
   useUpdateFertilizerSchedule,
   useUpdateSpraySchedule,
 } from "../hooks/useQueries";
@@ -1469,6 +1470,7 @@ function PlotCard({
   onAddSpray,
   onViewSchedules,
   onDelete,
+  onEdit,
 }: {
   crop: Crop;
   index: number;
@@ -1478,6 +1480,7 @@ function PlotCard({
   onAddSpray: (crop: Crop) => void;
   onViewSchedules: (crop: Crop) => void;
   onDelete: (crop: Crop) => void;
+  onEdit: (crop: Crop) => void;
 }) {
   return (
     <motion.div
@@ -1509,6 +1512,15 @@ function PlotCard({
           <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
             <Sprout className="w-5 h-5 text-primary" />
           </div>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="w-8 h-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+            onClick={() => onEdit(crop)}
+            data-ocid="plots.edit_button"
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
           <Button
             size="icon"
             variant="ghost"
@@ -1583,7 +1595,27 @@ export default function PlotsPage() {
 
   const [addPlotOpen, setAddPlotOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Crop | null>(null);
+  const [editTarget, setEditTarget] = useState<Crop | null>(null);
+  const [editPlotName, setEditPlotName] = useState("");
   const { mutateAsync: deleteCrop } = useDeleteCrop();
+  const { mutateAsync: updateCrop } = useUpdateCrop();
+
+  const handleEditPlot = async () => {
+    if (!editTarget) return;
+    try {
+      await updateCrop({
+        cropId: editTarget.id,
+        name: editTarget.name,
+        cropType: editTarget.cropType,
+        plotName: editPlotName.trim() || editTarget.plotName,
+      });
+      toast.success("Plot updated");
+    } catch {
+      toast.error("Failed to update plot");
+    } finally {
+      setEditTarget(null);
+    }
+  };
   const [fertTarget, setFertTarget] = useState<Crop | null>(null);
   const [sprayTarget, setSprayTarget] = useState<Crop | null>(null);
   const [viewTarget, setViewTarget] = useState<Crop | null>(null);
@@ -1725,6 +1757,10 @@ export default function PlotsPage() {
                           onAddSpray={setSprayTarget}
                           onViewSchedules={setViewTarget}
                           onDelete={setDeleteTarget}
+                          onEdit={(c) => {
+                            setEditTarget(c);
+                            setEditPlotName(c.plotName);
+                          }}
                         />
                       );
                     })}
@@ -1738,6 +1774,54 @@ export default function PlotsPage() {
 
       {/* Dialogs */}
       <AddPlotDialog open={addPlotOpen} onClose={() => setAddPlotOpen(false)} />
+      {/* Edit Plot Dialog */}
+      <Dialog
+        open={!!editTarget}
+        onOpenChange={(o) => !o && setEditTarget(null)}
+      >
+        <DialogContent
+          className="sm:max-w-md rounded-2xl"
+          data-ocid="plots.dialog"
+        >
+          <DialogHeader>
+            <DialogTitle>Edit Plot</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Update the plot name for this crop.
+            </p>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            <div>
+              <Label>Crop Name</Label>
+              <Input
+                value={editTarget?.name ?? ""}
+                disabled
+                className="bg-muted"
+              />
+            </div>
+            <div>
+              <Label>Plot Name</Label>
+              <Input
+                value={editPlotName}
+                onChange={(e) => setEditPlotName(e.target.value)}
+                placeholder="e.g. North Field"
+                data-ocid="plots.input"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button
+              variant="outline"
+              onClick={() => setEditTarget(null)}
+              data-ocid="plots.cancel_button"
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleEditPlot} data-ocid="plots.save_button">
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <AddFertilizerDialog
         crop={fertTarget}
         open={!!fertTarget}
