@@ -101,6 +101,7 @@ export interface Crop {
     id: bigint;
     name: string;
     cropType: string;
+    plotName: string;
 }
 export interface Date_ {
     day: bigint;
@@ -125,7 +126,7 @@ export enum UserRole {
 }
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
-    addCrop(name: string, cropType: string): Promise<bigint>;
+    addCrop(name: string, cropType: string, plotName: string): Promise<bigint>;
     addFertilizerSchedule(cropId: bigint, fertilizerName: string, scheduledDate: Date_, notes: string): Promise<bigint>;
     addSpraySchedule(cropId: bigint, sprayName: string, scheduledDate: Date_, notes: string): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
@@ -160,17 +161,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async addCrop(arg0: string, arg1: string): Promise<bigint> {
+    async addCrop(arg0: string, arg1: string, arg2: string): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.actor.addCrop(arg0, arg1);
+                const result = await this.actor.addCrop(arg0, arg1, arg2);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.addCrop(arg0, arg1);
+            const result = await this.actor.addCrop(arg0, arg1, arg2);
             return result;
         }
     }

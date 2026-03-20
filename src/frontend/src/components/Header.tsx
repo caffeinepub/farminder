@@ -1,16 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
-import { Leaf, Menu, X } from "lucide-react";
+import { CalendarDays, Layers, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 const NAV_LINKS = [
-  { label: "Home", to: "/" },
   { label: "Dashboard", to: "/dashboard" },
   { label: "My Crops", to: "/crops" },
-  { label: "Schedule", to: "/schedule" },
-  { label: "Spray Schedule", to: "/spray-schedule" },
+  { label: "Plots", to: "/plots", icon: Layers },
+  { label: "Calendar", to: "/calendar", icon: CalendarDays },
 ];
 
 export default function Header() {
@@ -43,9 +42,11 @@ export default function Header() {
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-border shadow-xs">
       <div className="container mx-auto px-4 flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-            <Leaf className="w-4 h-4 text-primary-foreground" />
-          </div>
+          <img
+            src="/assets/uploads/Screenshot_2026-03-19-17-53-17-36_40deb401b9ffe8e1df2f1cc5ba480b12-1.jpg"
+            alt="Farminder Logo"
+            className="w-9 h-9 object-contain rounded-full"
+          />
           <span className="font-display font-bold text-xl text-foreground">
             Farminder
           </span>
@@ -57,12 +58,13 @@ export default function Header() {
               key={link.to}
               to={link.to}
               data-ocid={`nav.${link.label.toLowerCase().replace(/ /g, "_")}.link`}
-              className={`text-sm font-medium transition-colors ${
+              className={`text-sm font-medium transition-colors flex items-center gap-1.5 ${
                 currentPath === link.to
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
+              {link.icon && <link.icon className="w-3.5 h-3.5" />}
               {link.label}
             </Link>
           ))}
@@ -101,12 +103,13 @@ export default function Header() {
               key={link.to}
               to={link.to}
               onClick={() => setMenuOpen(false)}
-              className={`text-sm font-medium py-2 ${
+              className={`text-sm font-medium py-2 flex items-center gap-1.5 ${
                 currentPath === link.to
                   ? "text-primary"
                   : "text-muted-foreground"
               }`}
             >
+              {link.icon && <link.icon className="w-3.5 h-3.5" />}
               {link.label}
             </Link>
           ))}

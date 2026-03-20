@@ -39,11 +39,12 @@ export const Crop = IDL.Record({
   'id' : IDL.Nat,
   'name' : IDL.Text,
   'cropType' : IDL.Text,
+  'plotName' : IDL.Text,
 });
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-  'addCrop' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
+  'addCrop' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
   'addFertilizerSchedule' : IDL.Func(
       [IDL.Nat, IDL.Text, Date, IDL.Text],
       [IDL.Nat],
@@ -124,11 +125,12 @@ export const idlFactory = ({ IDL }) => {
     'id' : IDL.Nat,
     'name' : IDL.Text,
     'cropType' : IDL.Text,
+    'plotName' : IDL.Text,
   });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-    'addCrop' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
+    'addCrop' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
     'addFertilizerSchedule' : IDL.Func(
         [IDL.Nat, IDL.Text, Date, IDL.Text],
         [IDL.Nat],

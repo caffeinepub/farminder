@@ -1,29 +1,29 @@
 # Farminder
 
 ## Current State
-The app has a Fertilizer Schedule feature with a calendar view, add/delete schedules, and today's dashboard. The backend has `FertilizerSchedule` type and related endpoints. There is no spray schedule yet.
+The app has Dashboard, My Crops, and Plots sections. The backend has `getAllFertilizerSchedules` and `getAllSpraySchedules` APIs. The frontend has matching hooks (`useGetAllFertilizerSchedules`, `useGetAllSpraySchedules`) but no Calendar page yet.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `SpraySchedule` type in backend (id, cropId, sprayName, scheduledDate, notes, isDone)
-- Backend functions: `addSpraySchedule`, `getSpraySchedulesForMonth`, `getTodaysSpraySchedules`, `markSprayScheduleAsDone`
-- SpraySchedulePage in frontend (same layout as SchedulePage but for spraying)
-- Navigation link to spray schedule page
-- Dashboard shows both fertilizer and spray tasks for today
+- A new Calendar page (`/calendar`) that displays upcoming fertilizer and spray tasks in a monthly calendar view
+- Calendar navigation to switch between months
+- Each day cell shows colored dots/badges for fertilizer (green) and spray (blue) tasks
+- Clicking a day shows a detail list of tasks for that day
+- "Calendar" link added to the header navigation
+- CalendarRoute added to App.tsx router
 
 ### Modify
-- Header/nav to include Spray Schedule link
-- DashboardPage to show spray reminders alongside fertilizer reminders
-- App routing to add `/spray-schedule` route
+- Header NAV_LINKS: add Calendar entry with CalendarDays icon
+- App.tsx: add calendarRoute
 
 ### Remove
 - Nothing
 
 ## Implementation Plan
-1. Update Motoko backend with SpraySchedule type and 4 new endpoints
-2. Regenerate frontend bindings
-3. Add spray schedule hooks in useQueries.ts
-4. Create SpraySchedulePage.tsx mirroring SchedulePage.tsx
-5. Update App.tsx routing and Header nav
-6. Update DashboardPage to show today's spray schedules
+1. Create `src/frontend/src/pages/CalendarPage.tsx` using `useGetAllFertilizerSchedules` and `useGetAllSpraySchedules` hooks
+2. Calendar renders a monthly grid; each day with tasks shows colored indicators
+3. Clicking a day opens a detail panel listing tasks for that day
+4. Add month prev/next navigation
+5. Add `/calendar` route in App.tsx
+6. Add Calendar nav link in Header.tsx

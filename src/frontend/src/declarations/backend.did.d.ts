@@ -10,7 +10,12 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
-export interface Crop { 'id' : bigint, 'name' : string, 'cropType' : string }
+export interface Crop {
+  'id' : bigint,
+  'name' : string,
+  'cropType' : string,
+  'plotName' : string,
+}
 export interface Date { 'day' : bigint, 'month' : bigint, 'year' : bigint }
 export interface FertilizerSchedule {
   'id' : bigint,
@@ -34,7 +39,7 @@ export type UserRole = { 'admin' : null } |
   { 'guest' : null };
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
-  'addCrop' : ActorMethod<[string, string], bigint>,
+  'addCrop' : ActorMethod<[string, string, string], bigint>,
   'addFertilizerSchedule' : ActorMethod<[bigint, string, Date, string], bigint>,
   'addSpraySchedule' : ActorMethod<[bigint, string, Date, string], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,

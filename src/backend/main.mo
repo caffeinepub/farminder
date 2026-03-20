@@ -4,9 +4,9 @@ import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
@@ -21,6 +21,7 @@ actor {
     id : Nat;
     name : Text;
     cropType : Text;
+    plotName : Text;
   };
 
   public type FertilizerSchedule = {
@@ -55,7 +56,6 @@ actor {
   let spraySchedules = Map.empty<Principal, List.List<SpraySchedule>>();
   let userProfiles = Map.empty<Principal, UserProfile>();
 
-  // User profile management
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     checkUserPermission(caller);
     userProfiles.get(caller);
@@ -73,14 +73,14 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // Crop management
-  public shared ({ caller }) func addCrop(name : Text, cropType : Text) : async Nat {
+  public shared ({ caller }) func addCrop(name : Text, cropType : Text, plotName : Text) : async Nat {
     checkUserPermission(caller);
 
     let newCrop : Crop = {
       id = nextCropId;
       name;
       cropType;
+      plotName;
     };
 
     let existingCrops = switch (crops.get(caller)) {
@@ -117,7 +117,6 @@ actor {
     crops.add(caller, newList);
   };
 
-  // Fertilizer Schedule management
   public shared ({ caller }) func addFertilizerSchedule(
     cropId : Nat,
     fertilizerName : Text,
@@ -147,6 +146,125 @@ actor {
     newSchedule.id;
   };
 
+  public shared ({ caller }) func updateFertilizerSchedule(
+    scheduleId : Nat,
+    fertilizerName : Text,
+    scheduledDate : Date,
+    notes : Text,
+  ) : async () {
+    checkUserPermission(caller);
+
+    let scheduleList = switch (fertilizerSchedules.get(caller)) {
+      case (null) { Runtime.trap("No schedules found for user") };
+      case (?list) { list };
+    };
+
+    let newList = scheduleList.map<FertilizerSchedule, FertilizerSchedule>(
+      func(schedule) {
+        if (schedule.id == scheduleId) {
+          {
+            id = schedule.id;
+            cropId = schedule.cropId;
+            fertilizerName;
+            scheduledDate;
+            notes;
+            isDone = schedule.isDone;
+          };
+        } else {
+          schedule;
+        };
+      }
+    );
+
+    fertilizerSchedules.add(caller, newList);
+  };
+
+  public shared ({ caller }) func deleteFertilizerSchedule(scheduleId : Nat) : async () {
+    checkUserPermission(caller);
+
+    let scheduleList = switch (fertilizerSchedules.get(caller)) {
+      case (null) { Runtime.trap("No schedules found for user") };
+      case (?list) { list };
+    };
+
+    let newList = scheduleList.filter(func(s) { s.id != scheduleId });
+    fertilizerSchedules.add(caller, newList);
+  };
+
+  public shared ({ caller }) func addSpraySchedule(
+    cropId : Nat,
+    sprayName : Text,
+    scheduledDate : Date,
+    notes : Text,
+  ) : async Nat {
+    checkUserPermission(caller);
+
+    let newSchedule : SpraySchedule = {
+      id = nextSprayScheduleId;
+      cropId;
+      sprayName;
+      scheduledDate;
+      notes;
+      isDone = false;
+    };
+
+    let existingSchedules = switch (spraySchedules.get(caller)) {
+      case (null) { List.empty<SpraySchedule>() };
+      case (?list) { list };
+    };
+
+    existingSchedules.add(newSchedule);
+    spraySchedules.add(caller, existingSchedules);
+
+    nextSprayScheduleId += 1;
+    newSchedule.id;
+  };
+
+  public shared ({ caller }) func updateSpraySchedule(
+    scheduleId : Nat,
+    sprayName : Text,
+    scheduledDate : Date,
+    notes : Text,
+  ) : async () {
+    checkUserPermission(caller);
+
+    let scheduleList = switch (spraySchedules.get(caller)) {
+      case (null) { Runtime.trap("No spray schedules found for user") };
+      case (?list) { list };
+    };
+
+    let newList = scheduleList.map<SpraySchedule, SpraySchedule>(
+      func(schedule) {
+        if (schedule.id == scheduleId) {
+          {
+            id = schedule.id;
+            cropId = schedule.cropId;
+            sprayName;
+            scheduledDate;
+            notes;
+            isDone = schedule.isDone;
+          };
+        } else {
+          schedule;
+        };
+      }
+    );
+
+    spraySchedules.add(caller, newList);
+  };
+
+  public shared ({ caller }) func deleteSpraySchedule(scheduleId : Nat) : async () {
+    checkUserPermission(caller);
+
+    let scheduleList = switch (spraySchedules.get(caller)) {
+      case (null) { Runtime.trap("No spray schedules found for user") };
+      case (?list) { list };
+    };
+
+    let newList = scheduleList.filter(func(s) { s.id != scheduleId });
+    spraySchedules.add(caller, newList);
+  };
+
   public query ({ caller }) func getFertilizerSchedulesForMonth(month : Nat, year : Nat) : async [FertilizerSchedule] {
     checkUserPermission(caller);
 
@@ -162,6 +280,28 @@ actor {
     );
 
     filtered.toArray();
+  };
+
+  public query ({ caller }) func getAllFertilizerSchedules() : async [FertilizerSchedule] {
+    checkUserPermission(caller);
+
+    let scheduleList = switch (fertilizerSchedules.get(caller)) {
+      case (null) { List.empty<FertilizerSchedule>() };
+      case (?list) { list };
+    };
+
+    scheduleList.toArray();
+  };
+
+  public query ({ caller }) func getAllSpraySchedules() : async [SpraySchedule] {
+    checkUserPermission(caller);
+
+    let scheduleList = switch (spraySchedules.get(caller)) {
+      case (null) { List.empty<SpraySchedule>() };
+      case (?list) { list };
+    };
+
+    scheduleList.toArray();
   };
 
   public query ({ caller }) func getTodaysFertilizerSchedules(currentDate : Date) : async [FertilizerSchedule] {
@@ -209,36 +349,6 @@ actor {
     );
 
     fertilizerSchedules.add(caller, newList);
-  };
-
-  // Spray Schedule management
-  public shared ({ caller }) func addSpraySchedule(
-    cropId : Nat,
-    sprayName : Text,
-    scheduledDate : Date,
-    notes : Text,
-  ) : async Nat {
-    checkUserPermission(caller);
-
-    let newSchedule : SpraySchedule = {
-      id = nextSprayScheduleId;
-      cropId;
-      sprayName;
-      scheduledDate;
-      notes;
-      isDone = false;
-    };
-
-    let existingSchedules = switch (spraySchedules.get(caller)) {
-      case (null) { List.empty<SpraySchedule>() };
-      case (?list) { list };
-    };
-
-    existingSchedules.add(newSchedule);
-    spraySchedules.add(caller, existingSchedules);
-
-    nextSprayScheduleId += 1;
-    newSchedule.id;
   };
 
   public query ({ caller }) func getSpraySchedulesForMonth(month : Nat, year : Nat) : async [SpraySchedule] {
@@ -305,7 +415,6 @@ actor {
     spraySchedules.add(caller, newList);
   };
 
-  // Helper function to check user permission
   func checkUserPermission(caller : Principal) {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can perform this action");

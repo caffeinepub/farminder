@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2, Plus, Sprout, Trash2 } from "lucide-react";
+import { Loader2, MapPin, Plus, Sprout, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -45,15 +45,17 @@ export default function CropsPage() {
 
   const [name, setName] = useState("");
   const [cropType, setCropType] = useState("");
+  const [plotName, setPlotName] = useState("");
   const [deleteId, setDeleteId] = useState<bigint | null>(null);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !cropType) return;
     try {
-      await addCrop({ name: name.trim(), cropType });
+      await addCrop({ name: name.trim(), cropType, plotName: plotName.trim() });
       setName("");
       setCropType("");
+      setPlotName("");
       toast.success(`${name.trim()} added!`);
     } catch {
       toast.error("Failed to add crop");
@@ -102,7 +104,7 @@ export default function CropsPage() {
                       data-ocid="crops.input"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Field A - Wheat"
+                      placeholder="e.g. Summer Wheat"
                     />
                   </div>
                   <div>
@@ -119,6 +121,16 @@ export default function CropsPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="plot-name">Plot Name</Label>
+                    <Input
+                      id="plot-name"
+                      data-ocid="crops.plot_name.input"
+                      value={plotName}
+                      onChange={(e) => setPlotName(e.target.value)}
+                      placeholder="e.g. Plot A, North Field"
+                    />
                   </div>
                   <Button
                     type="submit"
@@ -177,9 +189,20 @@ export default function CropsPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{crop.name}</p>
-                        <Badge variant="secondary" className="text-xs mt-0.5">
-                          {crop.cropType}
-                        </Badge>
+                        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                          <Badge variant="secondary" className="text-xs">
+                            {crop.cropType}
+                          </Badge>
+                          {crop.plotName && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs flex items-center gap-1"
+                            >
+                              <MapPin className="w-3 h-3" />
+                              {crop.plotName}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       <Button
                         size="icon"

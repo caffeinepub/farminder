@@ -15,8 +15,10 @@ import Header from "./components/Header";
 import ProfileSetup from "./components/ProfileSetup";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { useGetCallerUserProfile } from "./hooks/useQueries";
+import CalendarPage from "./pages/CalendarPage";
 import CropsPage from "./pages/CropsPage";
 import DashboardPage from "./pages/DashboardPage";
+import PlotsPage from "./pages/PlotsPage";
 import SchedulePage from "./pages/SchedulePage";
 import SpraySchedulePage from "./pages/SpraySchedulePage";
 
@@ -34,7 +36,6 @@ function LoginPage() {
           "linear-gradient(135deg, oklch(0.20 0.06 160) 0%, oklch(0.28 0.09 155) 40%, oklch(0.22 0.07 165) 100%)",
       }}
     >
-      {/* Background decorative circles */}
       <div
         className="absolute top-[-80px] left-[-80px] w-80 h-80 rounded-full opacity-10"
         style={{ background: "oklch(0.75 0.18 140)" }}
@@ -50,7 +51,6 @@ function LoginPage() {
         transition={{ duration: 0.6 }}
         className="relative z-10 flex flex-col items-center text-center px-6 max-w-md w-full"
       >
-        {/* Logo / Icon */}
         <div
           className="w-20 h-20 rounded-3xl flex items-center justify-center mb-6 shadow-lg"
           style={{ background: "oklch(0.75 0.18 140)" }}
@@ -58,7 +58,6 @@ function LoginPage() {
           <Leaf className="w-10 h-10 text-white" />
         </div>
 
-        {/* Brand name */}
         <h1
           className="font-display font-bold text-5xl mb-2"
           style={{ color: "oklch(0.92 0.10 140)" }}
@@ -69,14 +68,12 @@ function LoginPage() {
           Farm Reminder App
         </p>
 
-        {/* Tagline */}
         <p className="text-white/80 text-base leading-relaxed mb-10 mt-4">
           Sign in to manage your crops and schedules.
           <br />
           Your fertilizer &amp; spray reminders await.
         </p>
 
-        {/* Sign in card */}
         <div
           className="w-full rounded-2xl p-8 shadow-2xl"
           style={{
@@ -231,6 +228,16 @@ const cropsRoute = createRoute({
   ),
 });
 
+const plotsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/plots",
+  component: () => (
+    <AuthGuard>
+      <PlotsPage />
+    </AuthGuard>
+  ),
+});
+
 const scheduleRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/schedule",
@@ -251,12 +258,24 @@ const sprayScheduleRoute = createRoute({
   ),
 });
 
+const calendarRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/calendar",
+  component: () => (
+    <AuthGuard>
+      <CalendarPage />
+    </AuthGuard>
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   dashboardRoute,
   cropsRoute,
+  plotsRoute,
   scheduleRoute,
   sprayScheduleRoute,
+  calendarRoute,
 ]);
 
 const router = createRouter({ routeTree });

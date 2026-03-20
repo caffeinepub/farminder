@@ -59,9 +59,10 @@ export function useAddCrop() {
     mutationFn: async ({
       name,
       cropType,
-    }: { name: string; cropType: string }) => {
+      plotName,
+    }: { name: string; cropType: string; plotName: string }) => {
       if (!actor) throw new Error("Actor not available");
-      return actor.addCrop(name, cropType);
+      return actor.addCrop(name, cropType, plotName);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["crops"] }),
   });
@@ -105,6 +106,32 @@ export function useGetSpraySchedulesForMonth(month: number, year: number) {
     queryFn: async () => {
       if (!actor) return [];
       return actor.getSpraySchedulesForMonth(BigInt(month), BigInt(year));
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetAllFertilizerSchedules() {
+  const { actor, isFetching } = useActor();
+  return useQuery<FertilizerSchedule[]>({
+    queryKey: ["schedules", "fertilizer", "all"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as any).getAllFertilizerSchedules() as Promise<
+        FertilizerSchedule[]
+      >;
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetAllSpraySchedules() {
+  const { actor, isFetching } = useActor();
+  return useQuery<SpraySchedule[]>({
+    queryKey: ["schedules", "spray", "all"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as any).getAllSpraySchedules() as Promise<SpraySchedule[]>;
     },
     enabled: !!actor && !isFetching,
   });
@@ -174,6 +201,46 @@ export function useAddFertilizerSchedule() {
   });
 }
 
+export function useUpdateFertilizerSchedule() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      scheduleId: bigint;
+      fertilizerName: string;
+      scheduledDate: Date_;
+      notes: string;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).updateFertilizerSchedule(
+        params.scheduleId,
+        params.fertilizerName,
+        params.scheduledDate,
+        params.notes,
+      ) as Promise<void>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["schedules"] });
+    },
+  });
+}
+
+export function useDeleteFertilizerSchedule() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (scheduleId: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).deleteFertilizerSchedule(
+        scheduleId,
+      ) as Promise<void>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["schedules"] });
+    },
+  });
+}
+
 export function useAddSpraySchedule() {
   const { actor } = useActor();
   const qc = useQueryClient();
@@ -191,6 +258,44 @@ export function useAddSpraySchedule() {
         params.scheduledDate,
         params.notes,
       );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["schedules"] });
+    },
+  });
+}
+
+export function useUpdateSpraySchedule() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      scheduleId: bigint;
+      sprayName: string;
+      scheduledDate: Date_;
+      notes: string;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).updateSpraySchedule(
+        params.scheduleId,
+        params.sprayName,
+        params.scheduledDate,
+        params.notes,
+      ) as Promise<void>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["schedules"] });
+    },
+  });
+}
+
+export function useDeleteSpraySchedule() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (scheduleId: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).deleteSpraySchedule(scheduleId) as Promise<void>;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["schedules"] });

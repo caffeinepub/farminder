@@ -12,7 +12,7 @@ import {
   Sprout,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useNotifications } from "../hooks/useNotifications";
 import {
@@ -22,6 +22,19 @@ import {
   useMarkFertilizerScheduleAsDone,
   useMarkSprayScheduleAsDone,
 } from "../hooks/useQueries";
+
+function extractQty(notes: string): string | null {
+  const line = notes.split("\n").find((l) => l.startsWith("Qty:"));
+  return line ? line.replace("Qty:", "").trim() : null;
+}
+
+function extractUserNotes(notes: string): string {
+  return notes
+    .split("\n")
+    .filter((l) => !l.startsWith("Qty:"))
+    .join("\n")
+    .trim();
+}
 
 export default function DashboardPage() {
   const { data: crops, isLoading: cropsLoading } = useListCrops();
@@ -33,8 +46,12 @@ export default function DashboardPage() {
     useMarkFertilizerScheduleAsDone();
   const { mutateAsync: markSprayDone, isPending: sprayPending } =
     useMarkSprayScheduleAsDone();
-  const { isSupported, permission, requestPermission, sendDailyNotification } =
-    useNotifications();
+  const {
+    isSupported,
+    permission,
+    requestPermission,
+    scheduleDailyNotification,
+  } = useNotifications();
 
   const cropMap = new Map((crops ?? []).map((c) => [c.id.toString(), c]));
 
@@ -48,21 +65,26 @@ export default function DashboardPage() {
 
   const schedulesLoading = fertilizerLoading || sprayLoading;
 
-  // Send daily notification once schedules are loaded
+  const notificationScheduledRef = useRef(false);
+
   useEffect(() => {
     if (
       !fertilizerLoading &&
-      fertPending_.length > 0 &&
-      permission === "granted"
+      !sprayLoading &&
+      permission === "granted" &&
+      !notificationScheduledRef.current &&
+      (fertPending_.length > 0 || sprayPending_.length > 0)
     ) {
-      sendDailyNotification(fertPending_, cropMap);
+      notificationScheduledRef.current = true;
+      scheduleDailyNotification(fertPending_.length, sprayPending_.length);
     }
   }, [
     fertilizerLoading,
-    fertPending_,
-    cropMap,
+    sprayLoading,
+    fertPending_.length,
+    sprayPending_.length,
     permission,
-    sendDailyNotification,
+    scheduleDailyNotification,
   ]);
 
   const handleMarkFertDone = async (id: bigint) => {
@@ -87,7 +109,7 @@ export default function DashboardPage() {
     const result = await requestPermission();
     if (result === "granted") {
       toast.success(
-        "Notifications enabled! You'll be reminded about your tasks.",
+        "Notifications enabled! You'll get a reminder at 8 AM on task days.",
       );
     } else if (result === "denied") {
       toast.error(
@@ -173,7 +195,7 @@ export default function DashboardPage() {
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Please enable notifications in your browser or phone
-                      settings to receive daily fertilizer reminders.
+                      settings to receive daily reminders at 8 AM.
                     </p>
                   </div>
                 </div>
@@ -186,11 +208,12 @@ export default function DashboardPage() {
                     <Bell className="w-5 h-5 text-primary mt-0.5 shrink-0" />
                     <div>
                       <p className="font-semibold text-sm">
-                        Stay on top of your crops 🌾
+                        Get reminded at 8 AM every task day 🌾
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Enable notifications to get daily reminders when
-                        it&apos;s time to apply fertilizer or spray your crops.
+                        Enable notifications to receive a morning alert at
+                        8&nbsp;AM whenever you have fertilizer or spray tasks
+                        scheduled.
                       </p>
                     </div>
                   </div>
@@ -229,13 +252,15 @@ export default function DashboardPage() {
               No fertilizer tasks scheduled for today
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Go to Schedule to add fertilizer tasks
+              Go to Plots to add fertilizer tasks
             </p>
           </div>
         ) : (
           <div className="space-y-3 mb-8">
             {fertPending_.map((s, i) => {
               const crop = cropMap.get(s.cropId.toString());
+              const qty = extractQty(s.notes);
+              const userNotes = extractUserNotes(s.notes);
               return (
                 <motion.div
                   key={s.id.toString()}
@@ -252,12 +277,17 @@ export default function DashboardPage() {
                     <p className="font-semibold truncate">
                       {crop?.name ?? "Unknown Crop"}
                     </p>
-                    <p className="text-sm text-muted-foreground truncate">
+                    <p className="text-sm text-muted-foreground truncate flex items-center flex-wrap gap-1">
                       {s.fertilizerName}
+                      {qty && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                          {qty}
+                        </span>
+                      )}
                     </p>
-                    {s.notes && (
+                    {userNotes && (
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {s.notes}
+                        {userNotes}
                       </p>
                     )}
                   </div>
@@ -283,6 +313,7 @@ export default function DashboardPage() {
             })}
             {fertDone.map((s, i) => {
               const crop = cropMap.get(s.cropId.toString());
+              const qty = extractQty(s.notes);
               return (
                 <div
                   key={s.id.toString()}
@@ -294,8 +325,13 @@ export default function DashboardPage() {
                     <p className="font-semibold truncate line-through">
                       {crop?.name ?? "Unknown Crop"}
                     </p>
-                    <p className="text-sm text-muted-foreground truncate">
+                    <p className="text-sm text-muted-foreground truncate flex items-center flex-wrap gap-1">
                       {s.fertilizerName}
+                      {qty && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                          {qty}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <Badge className="shrink-0 text-xs">Done</Badge>
@@ -325,13 +361,15 @@ export default function DashboardPage() {
               No spray tasks scheduled for today
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Go to Spray Schedule to add spray tasks
+              Go to Plots to add spray tasks
             </p>
           </div>
         ) : (
           <div className="space-y-3">
             {sprayPending_.map((s, i) => {
               const crop = cropMap.get(s.cropId.toString());
+              const qty = extractQty(s.notes);
+              const userNotes = extractUserNotes(s.notes);
               return (
                 <motion.div
                   key={s.id.toString()}
@@ -348,12 +386,17 @@ export default function DashboardPage() {
                     <p className="font-semibold truncate">
                       {crop?.name ?? "Unknown Crop"}
                     </p>
-                    <p className="text-sm text-muted-foreground truncate">
+                    <p className="text-sm text-muted-foreground truncate flex items-center flex-wrap gap-1">
                       {s.sprayName}
+                      {qty && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                          {qty}
+                        </span>
+                      )}
                     </p>
-                    {s.notes && (
+                    {userNotes && (
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {s.notes}
+                        {userNotes}
                       </p>
                     )}
                   </div>
@@ -382,6 +425,7 @@ export default function DashboardPage() {
             })}
             {sprayDone.map((s, i) => {
               const crop = cropMap.get(s.cropId.toString());
+              const qty = extractQty(s.notes);
               return (
                 <div
                   key={s.id.toString()}
@@ -393,8 +437,13 @@ export default function DashboardPage() {
                     <p className="font-semibold truncate line-through">
                       {crop?.name ?? "Unknown Crop"}
                     </p>
-                    <p className="text-sm text-muted-foreground truncate">
+                    <p className="text-sm text-muted-foreground truncate flex items-center flex-wrap gap-1">
                       {s.sprayName}
+                      {qty && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                          {qty}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <Badge className="shrink-0 text-xs">Done</Badge>

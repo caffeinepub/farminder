@@ -19,6 +19,7 @@ export interface Crop {
     id: bigint;
     name: string;
     cropType: string;
+    plotName: string;
 }
 export interface Date_ {
     day: bigint;
@@ -42,9 +43,15 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
-    addCrop(name: string, cropType: string): Promise<bigint>;
+    addCrop(name: string, cropType: string, plotName: string): Promise<bigint>;
     addFertilizerSchedule(cropId: bigint, fertilizerName: string, scheduledDate: Date_, notes: string): Promise<bigint>;
     addSpraySchedule(cropId: bigint, sprayName: string, scheduledDate: Date_, notes: string): Promise<bigint>;
+    updateFertilizerSchedule(scheduleId: bigint, fertilizerName: string, scheduledDate: Date_, notes: string): Promise<void>;
+    updateSpraySchedule(scheduleId: bigint, sprayName: string, scheduledDate: Date_, notes: string): Promise<void>;
+    deleteFertilizerSchedule(scheduleId: bigint): Promise<void>;
+    deleteSpraySchedule(scheduleId: bigint): Promise<void>;
+    getAllFertilizerSchedules(): Promise<Array<FertilizerSchedule>>;
+    getAllSpraySchedules(): Promise<Array<SpraySchedule>>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     deleteCrop(cropId: bigint): Promise<void>;
     getCallerUserProfile(): Promise<UserProfile | null>;
