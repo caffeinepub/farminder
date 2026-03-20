@@ -67,7 +67,7 @@ import {
   useUpdateSpraySchedule,
 } from "../hooks/useQueries";
 
-const CROP_TYPES = [
+const _CROP_TYPES = [
   "Wheat",
   "Rice",
   "Corn",
@@ -165,22 +165,20 @@ function AddPlotDialog({
 }) {
   const { mutateAsync: addCrop, isPending } = useAddCrop();
   const [cropName, setCropName] = useState("");
-  const [cropType, setCropType] = useState("");
   const [plotName, setPlotName] = useState("");
 
   const reset = () => {
     setCropName("");
-    setCropType("");
     setPlotName("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cropName.trim() || !cropType) return;
+    if (!cropName.trim()) return;
     try {
       await addCrop({
         name: cropName.trim(),
-        cropType,
+        cropType: "",
         plotName: plotName.trim(),
       });
       toast.success("Plot added!");
@@ -219,21 +217,6 @@ function AddPlotDialog({
             />
           </div>
           <div>
-            <Label htmlFor="add-plot-crop-type">Crop Type</Label>
-            <Select value={cropType} onValueChange={setCropType}>
-              <SelectTrigger data-ocid="plots.select" id="add-plot-crop-type">
-                <SelectValue placeholder="Select crop type..." />
-              </SelectTrigger>
-              <SelectContent>
-                {CROP_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
             <Label htmlFor="add-plot-name">Plot Name</Label>
             <Input
               id="add-plot-name"
@@ -257,7 +240,7 @@ function AddPlotDialog({
             </Button>
             <Button
               type="submit"
-              disabled={isPending || !cropName.trim() || !cropType}
+              disabled={isPending || !cropName.trim()}
               data-ocid="plots.submit_button"
             >
               {isPending ? (
