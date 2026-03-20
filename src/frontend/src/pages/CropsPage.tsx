@@ -20,13 +20,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, MapPin, Pencil, Plus, Sprout, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -40,17 +33,6 @@ import {
   useUpdateCrop,
 } from "../hooks/useQueries";
 
-const CROP_TYPES = [
-  "Wheat",
-  "Rice",
-  "Corn",
-  "Tomato",
-  "Cotton",
-  "Soybean",
-  "Sugarcane",
-  "Custom",
-];
-
 export default function CropsPage() {
   const { data: crops, isLoading } = useListCrops();
   const { mutateAsync: addCrop, isPending: adding } = useAddCrop();
@@ -58,23 +40,24 @@ export default function CropsPage() {
   const { mutateAsync: deleteCrop, isPending: deleting } = useDeleteCrop();
 
   const [name, setName] = useState("");
-  const [cropType, setCropType] = useState("");
   const [plotName, setPlotName] = useState("");
   const [deleteId, setDeleteId] = useState<bigint | null>(null);
 
   // Edit state
   const [editCrop, setEditCrop] = useState<Crop | null>(null);
   const [editName, setEditName] = useState("");
-  const [editCropType, setEditCropType] = useState("");
   const [editPlotName, setEditPlotName] = useState("");
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !cropType) return;
+    if (!name.trim()) return;
     try {
-      await addCrop({ name: name.trim(), cropType, plotName: plotName.trim() });
+      await addCrop({
+        name: name.trim(),
+        cropType: "",
+        plotName: plotName.trim(),
+      });
       setName("");
-      setCropType("");
       setPlotName("");
       toast.success(`${name.trim()} added!`);
     } catch {
@@ -85,18 +68,17 @@ export default function CropsPage() {
   const openEdit = (crop: Crop) => {
     setEditCrop(crop);
     setEditName(crop.name);
-    setEditCropType(crop.cropType);
     setEditPlotName(crop.plotName);
   };
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editCrop || !editName.trim() || !editCropType) return;
+    if (!editCrop || !editName.trim()) return;
     try {
       await updateCrop({
         cropId: editCrop.id,
         name: editName.trim(),
-        cropType: editCropType,
+        cropType: "",
         plotName: editPlotName.trim(),
       });
       toast.success("Crop updated!");
@@ -152,21 +134,6 @@ export default function CropsPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="crop-type">Crop Type</Label>
-                    <Select value={cropType} onValueChange={setCropType}>
-                      <SelectTrigger data-ocid="crops.select" id="crop-type">
-                        <SelectValue placeholder="Select type..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CROP_TYPES.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
                     <Label htmlFor="plot-name">Plot Name</Label>
                     <Input
                       id="plot-name"
@@ -178,7 +145,7 @@ export default function CropsPage() {
                   </div>
                   <Button
                     type="submit"
-                    disabled={adding || !name.trim() || !cropType}
+                    disabled={adding || !name.trim()}
                     data-ocid="crops.submit_button"
                     className="rounded-full w-full"
                   >
@@ -234,9 +201,6 @@ export default function CropsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{crop.name}</p>
                         <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                          <Badge variant="secondary" className="text-xs">
-                            {crop.cropType}
-                          </Badge>
                           {crop.plotName && (
                             <Badge
                               variant="outline"
@@ -294,21 +258,6 @@ export default function CropsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="edit-crop-type">Crop Type</Label>
-              <Select value={editCropType} onValueChange={setEditCropType}>
-                <SelectTrigger id="edit-crop-type">
-                  <SelectValue placeholder="Select type..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {CROP_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
               <Label htmlFor="edit-plot-name">Plot Name</Label>
               <Input
                 id="edit-plot-name"
@@ -325,10 +274,7 @@ export default function CropsPage() {
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={updating || !editName.trim() || !editCropType}
-              >
+              <Button type="submit" disabled={updating || !editName.trim()}>
                 {updating ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : null}
