@@ -1,20 +1,24 @@
 # Farminder
 
 ## Current State
-The app has a `checkUserPermission` function in the backend that calls `AccessControl.hasPermission`, which in turn calls `getUserRole`. If a user is not registered in the access control state (e.g., after a canister upgrade clears non-stable state, or if `_initializeAccessControlWithSecret` didn't complete), `getUserRole` traps with "User is not registered". This causes all data operations (addCrop, addPlot, addFertilizerSchedule, etc.) to fail with an error caught on the frontend as "Failed to add crop/plot".
+Backend uses non-stable in-memory Maps for crops, fertilizer schedules, spray schedules, and user profiles. All counters (nextCropId, nextFertilizerScheduleId, nextSprayScheduleId) are also non-stable. This means every canister upgrade (every deployment) wipes all user data — the root cause of schedules disappearing.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Auto-registration logic for authenticated (non-anonymous) users
+- Stable storage arrays for all data (crops, fertilizer schedules, spray schedules, user profiles, and ID counters)
+- `preupgrade` system hook to serialize in-memory Maps to stable arrays
+- `postupgrade` system hook to restore in-memory Maps from stable arrays on canister start
 
 ### Modify
-- `access-control.mo`: `getUserRole` should return `#user` for unregistered but authenticated (non-anonymous) principals instead of trapping — this makes any logged-in user able to use the app without needing explicit registration
-- `main.mo`: `checkUserPermission` should reject anonymous callers directly, without relying on the access control registration state
+- Convert `var nextCropId`, `var nextFertilizerScheduleId`, `var nextSprayScheduleId` to `stable var`
+- Add stable backing vars for all four Maps
 
 ### Remove
-- Nothing
+- Nothing removed
 
 ## Implementation Plan
-1. Update `getUserRole` in `access-control.mo` to return `#user` for unregistered non-anonymous principals
-2. Update `checkUserPermission` in `main.mo` to first reject anonymous callers, then delegate to permission check
+1. Add `stable var` arrays for each data store (crops, fertSchedules, spraySchedules, profiles) as `[(Principal, [T])]`
+2. Add `stable var` for ID counters
+3. Add `system func preupgrade()` that copies Maps → stable arrays
+4. Add `system func postupgrade()` that restores Maps from stable arrays

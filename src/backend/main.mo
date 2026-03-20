@@ -46,15 +46,69 @@ actor {
     name : Text;
   };
 
-  var nextCropId = 0;
-  var nextFertilizerScheduleId = 0;
-  var nextSprayScheduleId = 0;
+  // Stable storage for persistence across upgrades
+  var stableNextCropId : Nat = 0;
+  var stableNextFertilizerScheduleId : Nat = 0;
+  var stableNextSprayScheduleId : Nat = 0;
+  var stableCrops : [(Principal, [Crop])] = [];
+  var stableFertilizerSchedules : [(Principal, [FertilizerSchedule])] = [];
+  var stableSpraySchedules : [(Principal, [SpraySchedule])] = [];
+  var stableUserProfiles : [(Principal, UserProfile)] = [];
 
-  // Data stores per user (principal)
+  var nextCropId = stableNextCropId;
+  var nextFertilizerScheduleId = stableNextFertilizerScheduleId;
+  var nextSprayScheduleId = stableNextSprayScheduleId;
+
+  // Data stores per user (principal) - initialized from stable storage
   let crops = Map.empty<Principal, List.List<Crop>>();
   let fertilizerSchedules = Map.empty<Principal, List.List<FertilizerSchedule>>();
   let spraySchedules = Map.empty<Principal, List.List<SpraySchedule>>();
   let userProfiles = Map.empty<Principal, UserProfile>();
+
+  // Restore data from stable storage on canister start
+  for ((p, arr) in stableCrops.vals()) {
+    crops.add(p, List.fromArray<Crop>(arr));
+  };
+  for ((p, arr) in stableFertilizerSchedules.vals()) {
+    fertilizerSchedules.add(p, List.fromArray<FertilizerSchedule>(arr));
+  };
+  for ((p, arr) in stableSpraySchedules.vals()) {
+    spraySchedules.add(p, List.fromArray<SpraySchedule>(arr));
+  };
+  for ((p, profile) in stableUserProfiles.vals()) {
+    userProfiles.add(p, profile);
+  };
+
+  // Save data to stable storage before upgrade
+  system func preupgrade() {
+    stableNextCropId := nextCropId;
+    stableNextFertilizerScheduleId := nextFertilizerScheduleId;
+    stableNextSprayScheduleId := nextSprayScheduleId;
+
+    let cropsBuf = List.empty<(Principal, [Crop])>();
+    for ((p, list) in crops.entries()) {
+      cropsBuf.add((p, list.toArray()));
+    };
+    stableCrops := cropsBuf.toArray();
+
+    let fertBuf = List.empty<(Principal, [FertilizerSchedule])>();
+    for ((p, list) in fertilizerSchedules.entries()) {
+      fertBuf.add((p, list.toArray()));
+    };
+    stableFertilizerSchedules := fertBuf.toArray();
+
+    let sprayBuf = List.empty<(Principal, [SpraySchedule])>();
+    for ((p, list) in spraySchedules.entries()) {
+      sprayBuf.add((p, list.toArray()));
+    };
+    stableSpraySchedules := sprayBuf.toArray();
+
+    let profileBuf = List.empty<(Principal, UserProfile)>();
+    for ((p, profile) in userProfiles.entries()) {
+      profileBuf.add((p, profile));
+    };
+    stableUserProfiles := profileBuf.toArray();
+  };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     checkAnonymous(caller);
