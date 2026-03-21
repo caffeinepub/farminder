@@ -361,3 +361,189 @@ export function useMarkSprayScheduleAsDone() {
     },
   });
 }
+
+// ---- Shared Plots ----
+
+export function useGetMySharedPlots() {
+  const { actor, isFetching } = useActor();
+  return useQuery<any[]>({
+    queryKey: ["sharedPlots"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as any).getMySharedPlots() as Promise<any[]>;
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useCreateSharedPlot() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      cropName,
+      plotName,
+    }: { cropName: string; plotName: string }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).createSharedPlot(
+        cropName,
+        plotName,
+      ) as Promise<bigint>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sharedPlots"] }),
+  });
+}
+
+export function useInviteCollaborator() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sharedPlotId,
+      collaboratorId,
+    }: { sharedPlotId: bigint; collaboratorId: string }) => {
+      if (!actor) throw new Error("Actor not available");
+      const { Principal } = await import("@icp-sdk/core/principal");
+      const principal = Principal.fromText(collaboratorId);
+      return (actor as any).inviteCollaborator(
+        sharedPlotId,
+        principal,
+      ) as Promise<void>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sharedPlots"] }),
+  });
+}
+
+export function useRemoveCollaborator() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sharedPlotId,
+      collaboratorId,
+    }: { sharedPlotId: bigint; collaboratorId: string }) => {
+      if (!actor) throw new Error("Actor not available");
+      const { Principal } = await import("@icp-sdk/core/principal");
+      const principal = Principal.fromText(collaboratorId);
+      return (actor as any).removeCollaborator(
+        sharedPlotId,
+        principal,
+      ) as Promise<void>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sharedPlots"] }),
+  });
+}
+
+export function useGetSharedPlotSchedules(sharedPlotId: bigint) {
+  const { actor, isFetching } = useActor();
+  return useQuery<any>({
+    queryKey: ["sharedPlotSchedules", sharedPlotId.toString()],
+    queryFn: async () => {
+      if (!actor) return { fertilizerSchedules: [], spraySchedules: [] };
+      return (actor as any).getSharedPlotSchedules(
+        sharedPlotId,
+      ) as Promise<any>;
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useAddSharedFertilizerSchedule() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      sharedPlotId: bigint;
+      fertilizerName: string;
+      quantity: string;
+      scheduledDate: Date_;
+      notes: string;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).addSharedFertilizerSchedule(
+        params.sharedPlotId,
+        params.fertilizerName,
+        params.quantity,
+        params.scheduledDate,
+        params.notes,
+      ) as Promise<bigint>;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({
+        queryKey: ["sharedPlotSchedules", vars.sharedPlotId.toString()],
+      });
+    },
+  });
+}
+
+export function useDeleteSharedFertilizerSchedule() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sharedPlotId,
+      scheduleId,
+    }: { sharedPlotId: bigint; scheduleId: bigint }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).deleteSharedFertilizerSchedule(
+        sharedPlotId,
+        scheduleId,
+      ) as Promise<void>;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({
+        queryKey: ["sharedPlotSchedules", vars.sharedPlotId.toString()],
+      });
+    },
+  });
+}
+
+export function useAddSharedSpraySchedule() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      sharedPlotId: bigint;
+      sprayName: string;
+      quantity: string;
+      scheduledDate: Date_;
+      notes: string;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).addSharedSpraySchedule(
+        params.sharedPlotId,
+        params.sprayName,
+        params.quantity,
+        params.scheduledDate,
+        params.notes,
+      ) as Promise<bigint>;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({
+        queryKey: ["sharedPlotSchedules", vars.sharedPlotId.toString()],
+      });
+    },
+  });
+}
+
+export function useDeleteSharedSpraySchedule() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sharedPlotId,
+      scheduleId,
+    }: { sharedPlotId: bigint; scheduleId: bigint }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).deleteSharedSpraySchedule(
+        sharedPlotId,
+        scheduleId,
+      ) as Promise<void>;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({
+        queryKey: ["sharedPlotSchedules", vars.sharedPlotId.toString()],
+      });
+    },
+  });
+}

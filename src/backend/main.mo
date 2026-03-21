@@ -44,6 +44,39 @@ actor {
     name : Text;
   };
 
+  public type SharedPlot = {
+    id : Nat;
+    cropName : Text;
+    plotName : Text;
+    owner : Principal;
+    collaborators : [Principal];
+  };
+
+  public type SharedFertilizerSchedule = {
+    id : Nat;
+    sharedPlotId : Nat;
+    fertilizerName : Text;
+    quantity : Text;
+    scheduledDate : Date;
+    notes : Text;
+    addedBy : Principal;
+  };
+
+  public type SharedSpraySchedule = {
+    id : Nat;
+    sharedPlotId : Nat;
+    sprayName : Text;
+    quantity : Text;
+    scheduledDate : Date;
+    notes : Text;
+    addedBy : Principal;
+  };
+
+  public type SharedPlotSchedules = {
+    fertilizerSchedules : [SharedFertilizerSchedule];
+    spraySchedules : [SharedSpraySchedule];
+  };
+
   // Stable storage for persistence across upgrades
   stable var stableNextCropId : Nat = 0;
   stable var stableNextFertilizerScheduleId : Nat = 0;
@@ -53,14 +86,28 @@ actor {
   stable var stableSpraySchedules : [(Principal, [SpraySchedule])] = [];
   stable var stableUserProfiles : [(Principal, UserProfile)] = [];
 
+  // Shared plot stable storage
+  stable var stableNextSharedPlotId : Nat = 0;
+  stable var stableNextSharedFertScheduleId : Nat = 0;
+  stable var stableNextSharedSprayScheduleId : Nat = 0;
+  stable var stableSharedPlots : [(Nat, SharedPlot)] = [];
+  stable var stableSharedFertilizerSchedules : [(Nat, [SharedFertilizerSchedule])] = [];
+  stable var stableSharedSpraySchedules : [(Nat, [SharedSpraySchedule])] = [];
+
   var nextCropId = stableNextCropId;
   var nextFertilizerScheduleId = stableNextFertilizerScheduleId;
   var nextSprayScheduleId = stableNextSprayScheduleId;
+  var nextSharedPlotId = stableNextSharedPlotId;
+  var nextSharedFertScheduleId = stableNextSharedFertScheduleId;
+  var nextSharedSprayScheduleId = stableNextSharedSprayScheduleId;
 
   let crops = Map.empty<Principal, List.List<Crop>>();
   let fertilizerSchedules = Map.empty<Principal, List.List<FertilizerSchedule>>();
   let spraySchedules = Map.empty<Principal, List.List<SpraySchedule>>();
   let userProfiles = Map.empty<Principal, UserProfile>();
+  let sharedPlots = Map.empty<Nat, SharedPlot>();
+  let sharedFertilizerSchedules = Map.empty<Nat, List.List<SharedFertilizerSchedule>>();
+  let sharedSpraySchedules = Map.empty<Nat, List.List<SharedSpraySchedule>>();
 
   // Restore data from stable storage on canister start
   for ((p, arr) in stableCrops.vals()) {
@@ -75,11 +122,23 @@ actor {
   for ((p, profile) in stableUserProfiles.vals()) {
     userProfiles.add(p, profile);
   };
+  for ((id, plot) in stableSharedPlots.vals()) {
+    sharedPlots.add(id, plot);
+  };
+  for ((id, arr) in stableSharedFertilizerSchedules.vals()) {
+    sharedFertilizerSchedules.add(id, List.fromArray<SharedFertilizerSchedule>(arr));
+  };
+  for ((id, arr) in stableSharedSpraySchedules.vals()) {
+    sharedSpraySchedules.add(id, List.fromArray<SharedSpraySchedule>(arr));
+  };
 
   system func preupgrade() {
     stableNextCropId := nextCropId;
     stableNextFertilizerScheduleId := nextFertilizerScheduleId;
     stableNextSprayScheduleId := nextSprayScheduleId;
+    stableNextSharedPlotId := nextSharedPlotId;
+    stableNextSharedFertScheduleId := nextSharedFertScheduleId;
+    stableNextSharedSprayScheduleId := nextSharedSprayScheduleId;
 
     let cropsBuf = List.empty<(Principal, [Crop])>();
     for ((p, list) in crops.entries()) {
@@ -104,6 +163,24 @@ actor {
       profileBuf.add((p, profile));
     };
     stableUserProfiles := profileBuf.toArray();
+
+    let sharedPlotsBuf = List.empty<(Nat, SharedPlot)>();
+    for ((id, plot) in sharedPlots.entries()) {
+      sharedPlotsBuf.add((id, plot));
+    };
+    stableSharedPlots := sharedPlotsBuf.toArray();
+
+    let sharedFertBuf = List.empty<(Nat, [SharedFertilizerSchedule])>();
+    for ((id, list) in sharedFertilizerSchedules.entries()) {
+      sharedFertBuf.add((id, list.toArray()));
+    };
+    stableSharedFertilizerSchedules := sharedFertBuf.toArray();
+
+    let sharedSprayBuf = List.empty<(Nat, [SharedSpraySchedule])>();
+    for ((id, list) in sharedSpraySchedules.entries()) {
+      sharedSprayBuf.add((id, list.toArray()));
+    };
+    stableSharedSpraySchedules := sharedSprayBuf.toArray();
   };
 
   system func postupgrade() {
@@ -119,9 +196,21 @@ actor {
     for ((p, profile) in stableUserProfiles.vals()) {
       userProfiles.add(p, profile);
     };
+    for ((id, plot) in stableSharedPlots.vals()) {
+      sharedPlots.add(id, plot);
+    };
+    for ((id, arr) in stableSharedFertilizerSchedules.vals()) {
+      sharedFertilizerSchedules.add(id, List.fromArray<SharedFertilizerSchedule>(arr));
+    };
+    for ((id, arr) in stableSharedSpraySchedules.vals()) {
+      sharedSpraySchedules.add(id, List.fromArray<SharedSpraySchedule>(arr));
+    };
     nextCropId := stableNextCropId;
     nextFertilizerScheduleId := stableNextFertilizerScheduleId;
     nextSprayScheduleId := stableNextSprayScheduleId;
+    nextSharedPlotId := stableNextSharedPlotId;
+    nextSharedFertScheduleId := stableNextSharedFertScheduleId;
+    nextSharedSprayScheduleId := stableNextSharedSprayScheduleId;
   };
 
   // Only blocks unauthenticated (anonymous) callers
@@ -129,6 +218,14 @@ actor {
     if (caller.isAnonymous()) {
       Runtime.trap("Unauthorized: Must be logged in");
     };
+  };
+
+  func isCollaborator(plot : SharedPlot, caller : Principal) : Bool {
+    if (plot.owner == caller) return true;
+    for (c in plot.collaborators.vals()) {
+      if (c == caller) return true;
+    };
+    false;
   };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
@@ -373,4 +470,209 @@ actor {
       case (?list) { list.toArray() };
     };
   };
+
+  public type PlotShareData = {
+    crops : [Crop];
+    fertilizerSchedules : [FertilizerSchedule];
+    spraySchedules : [SpraySchedule];
+  };
+
+  public query func getPlotSchedulesPublic(userPrincipal : Principal, plotName : Text) : async PlotShareData {
+    let userCrops = switch (crops.get(userPrincipal)) {
+      case (null) { [] };
+      case (?list) { list.filter(func(c) { c.plotName == plotName }).toArray() };
+    };
+    let cropIds = userCrops.map(func(c : Crop) : Nat { c.id });
+    let hasCropId = func(id : Nat) : Bool {
+      for (cid in cropIds.vals()) { if (cid == id) { return true }; };
+      false;
+    };
+    let fertiArr = switch (fertilizerSchedules.get(userPrincipal)) {
+      case (null) { [] };
+      case (?list) { list.filter(func(s) { hasCropId(s.cropId) }).toArray() };
+    };
+    let sprayArr = switch (spraySchedules.get(userPrincipal)) {
+      case (null) { [] };
+      case (?list) { list.filter(func(s) { hasCropId(s.cropId) }).toArray() };
+    };
+    { crops = userCrops; fertilizerSchedules = fertiArr; spraySchedules = sprayArr };
+  };
+
+  // ---- Shared Plot Collaboration ----
+
+  public shared ({ caller }) func createSharedPlot(cropName : Text, plotName : Text) : async Nat {
+    checkAnonymous(caller);
+    let newPlot : SharedPlot = {
+      id = nextSharedPlotId;
+      cropName;
+      plotName;
+      owner = caller;
+      collaborators = [];
+    };
+    sharedPlots.add(nextSharedPlotId, newPlot);
+    nextSharedPlotId += 1;
+    newPlot.id;
+  };
+
+  public shared ({ caller }) func inviteCollaborator(sharedPlotId : Nat, collaborator : Principal) : async () {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    if (plot.owner != caller) Runtime.trap("Only the owner can invite collaborators");
+    // Check not already added
+    for (c in plot.collaborators.vals()) {
+      if (c == collaborator) Runtime.trap("Already a collaborator");
+    };
+    let newCollaborators = List.empty<Principal>();
+    for (c in plot.collaborators.vals()) { newCollaborators.add(c); };
+    newCollaborators.add(collaborator);
+    sharedPlots.add(sharedPlotId, {
+      id = plot.id;
+      cropName = plot.cropName;
+      plotName = plot.plotName;
+      owner = plot.owner;
+      collaborators = newCollaborators.toArray();
+    });
+  };
+
+  public shared ({ caller }) func removeCollaborator(sharedPlotId : Nat, collaborator : Principal) : async () {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    if (plot.owner != caller) Runtime.trap("Only the owner can remove collaborators");
+    let remaining = List.empty<Principal>();
+    for (c in plot.collaborators.vals()) {
+      if (c != collaborator) remaining.add(c);
+    };
+    sharedPlots.add(sharedPlotId, {
+      id = plot.id;
+      cropName = plot.cropName;
+      plotName = plot.plotName;
+      owner = plot.owner;
+      collaborators = remaining.toArray();
+    });
+  };
+
+  public query ({ caller }) func getMySharedPlots() : async [SharedPlot] {
+    checkAnonymous(caller);
+    let result = List.empty<SharedPlot>();
+    for ((_, plot) in sharedPlots.entries()) {
+      if (isCollaborator(plot, caller)) result.add(plot);
+    };
+    result.toArray();
+  };
+
+  public shared ({ caller }) func addSharedFertilizerSchedule(
+    sharedPlotId : Nat, fertilizerName : Text, quantity : Text, scheduledDate : Date, notes : Text,
+  ) : async Nat {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    if (not isCollaborator(plot, caller)) Runtime.trap("Not authorized for this plot");
+    let newSchedule : SharedFertilizerSchedule = {
+      id = nextSharedFertScheduleId;
+      sharedPlotId;
+      fertilizerName;
+      quantity;
+      scheduledDate;
+      notes;
+      addedBy = caller;
+    };
+    let existing = switch (sharedFertilizerSchedules.get(sharedPlotId)) {
+      case (null) { List.empty<SharedFertilizerSchedule>() };
+      case (?l) { l };
+    };
+    existing.add(newSchedule);
+    sharedFertilizerSchedules.add(sharedPlotId, existing);
+    nextSharedFertScheduleId += 1;
+    newSchedule.id;
+  };
+
+  public shared ({ caller }) func deleteSharedFertilizerSchedule(sharedPlotId : Nat, scheduleId : Nat) : async () {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    let list = switch (sharedFertilizerSchedules.get(sharedPlotId)) {
+      case (null) { Runtime.trap("No schedules found") };
+      case (?l) { l };
+    };
+    // Only owner or the person who added it can delete
+    let target = list.filter(func(s) { s.id == scheduleId });
+    if (target.size() == 0) Runtime.trap("Schedule not found");
+    let s = target.toArray()[0];
+    if (plot.owner != caller and s.addedBy != caller) Runtime.trap("Not authorized to delete this schedule");
+    sharedFertilizerSchedules.add(sharedPlotId, list.filter(func(s2) { s2.id != scheduleId }));
+  };
+
+  public shared ({ caller }) func addSharedSpraySchedule(
+    sharedPlotId : Nat, sprayName : Text, quantity : Text, scheduledDate : Date, notes : Text,
+  ) : async Nat {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    if (not isCollaborator(plot, caller)) Runtime.trap("Not authorized for this plot");
+    let newSchedule : SharedSpraySchedule = {
+      id = nextSharedSprayScheduleId;
+      sharedPlotId;
+      sprayName;
+      quantity;
+      scheduledDate;
+      notes;
+      addedBy = caller;
+    };
+    let existing = switch (sharedSpraySchedules.get(sharedPlotId)) {
+      case (null) { List.empty<SharedSpraySchedule>() };
+      case (?l) { l };
+    };
+    existing.add(newSchedule);
+    sharedSpraySchedules.add(sharedPlotId, existing);
+    nextSharedSprayScheduleId += 1;
+    newSchedule.id;
+  };
+
+  public shared ({ caller }) func deleteSharedSpraySchedule(sharedPlotId : Nat, scheduleId : Nat) : async () {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    let list = switch (sharedSpraySchedules.get(sharedPlotId)) {
+      case (null) { Runtime.trap("No schedules found") };
+      case (?l) { l };
+    };
+    let target = list.filter(func(s) { s.id == scheduleId });
+    if (target.size() == 0) Runtime.trap("Schedule not found");
+    let s = target.toArray()[0];
+    if (plot.owner != caller and s.addedBy != caller) Runtime.trap("Not authorized to delete this schedule");
+    sharedSpraySchedules.add(sharedPlotId, list.filter(func(s2) { s2.id != scheduleId }));
+  };
+
+  public query ({ caller }) func getSharedPlotSchedules(sharedPlotId : Nat) : async SharedPlotSchedules {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    if (not isCollaborator(plot, caller)) Runtime.trap("Not authorized for this plot");
+    let fertArr = switch (sharedFertilizerSchedules.get(sharedPlotId)) {
+      case (null) { [] };
+      case (?l) { l.toArray() };
+    };
+    let sprayArr = switch (sharedSpraySchedules.get(sharedPlotId)) {
+      case (null) { [] };
+      case (?l) { l.toArray() };
+    };
+    { fertilizerSchedules = fertArr; spraySchedules = sprayArr };
+  };
+
 };

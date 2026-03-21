@@ -37,6 +37,11 @@ export interface FertilizerSchedule {
 export interface UserProfile {
     name: string;
 }
+export interface PlotShareData {
+    crops: Array<Crop>;
+    fertilizerSchedules: Array<FertilizerSchedule>;
+    spraySchedules: Array<SpraySchedule>;
+}
 export interface backendInterface {
     addCrop(name: string, cropType: string, plotName: string): Promise<bigint>;
     listCrops(): Promise<Array<Crop>>;
@@ -59,4 +64,5 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getPlotSchedulesPublic(userPrincipal: Principal, plotName: string): Promise<PlotShareData>;
 }

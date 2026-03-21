@@ -1,26 +1,34 @@
 # Farminder
 
 ## Current State
-Farminder has Dashboard, My Crops, Plots, and Calendar sections. Fertilizer and spray schedules are stored in the backend with name, date, cropId, and notes fields.
+All crops, plots, fertilizer and spray schedules are stored per-user principal. Each farmer owns their own data and no cross-user collaboration exists. A public share link allows read-only viewing.
 
 ## Requested Changes (Diff)
 
 ### Add
-- New "Materials" page at `/materials` showing current month's fertilizer and spray schedules in a 3-column card grid
-- Each card displays: material name (fertilizer/spray), date, plot name, quantity (from notes), and type badge (Fertilizer/Spray)
-- Cards sorted by date
-- Month navigation to view other months
-- Navigation link in Header
-- Route in App.tsx
+- Shared Plot concept: any logged-in farmer can create a shared plot that multiple farmers can collaborate on
+- Backend data structures: `SharedPlot` (id, name, cropName, ownerPrincipal, collaborators list), `SharedFertilizerSchedule`, `SharedSpraySchedule` (same fields as existing but linked to sharedPlotId and include addedByPrincipal)
+- Backend functions:
+  - `createSharedPlot(cropName, plotName)` -- owner creates it, returns sharedPlotId
+  - `inviteCollaborator(sharedPlotId, collaboratorPrincipal)` -- owner invites farmer by principal
+  - `removeCollaborator(sharedPlotId, collaboratorPrincipal)` -- owner removes collaborator
+  - `getMySharedPlots()` -- returns plots the caller owns or is a collaborator on
+  - `addSharedFertilizerSchedule(sharedPlotId, fertilizerName, scheduledDate, quantity, notes)` -- any collaborator can add
+  - `addSharedSpraySchedule(sharedPlotId, sprayName, scheduledDate, quantity, notes)` -- any collaborator can add
+  - `getSharedPlotSchedules(sharedPlotId)` -- returns all fertilizer and spray schedules for the shared plot
+  - `deleteSharedFertilizerSchedule(scheduleId)` -- only owner or the adder can delete
+  - `deleteSharedSpraySchedule(scheduleId)` -- only owner or the adder can delete
+- Frontend: new "Collaborate" tab/section in the Plots page showing shared plots separately from personal plots. Owner can invite farmers by entering their principal ID. Shows who added each schedule entry.
 
 ### Modify
-- Header: add Materials nav link
-- App.tsx: add materialsRoute
+- Plots page: add a "Shared Plots" section below personal plots with ability to create shared plots and manage collaborators
 
 ### Remove
-- Nothing
+- Nothing removed
 
 ## Implementation Plan
-1. Create `MaterialsPage.tsx` fetching current month fertilizer + spray schedules, joining with crops for plot name, displaying in 3-column responsive grid sorted by date
-2. Add route `/materials` in App.tsx
-3. Add Materials nav link in Header.tsx
+1. Add SharedPlot, SharedFertilizerSchedule, SharedSpraySchedule types to Motoko
+2. Add stable storage variables for shared data
+3. Implement all shared plot backend functions with access checks
+4. Regenerate backend bindings
+5. Frontend: add Shared Plots section to Plots page with invite UI and collaborative schedule view

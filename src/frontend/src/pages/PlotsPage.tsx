@@ -37,6 +37,7 @@ import {
   MapPin,
   Pencil,
   Plus,
+  Share2,
   Sprout,
   Trash2,
   Wind,
@@ -50,6 +51,7 @@ import type {
   FertilizerSchedule,
   SpraySchedule,
 } from "../backend.d";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAddCrop,
   useAddFertilizerSchedule,
@@ -66,6 +68,7 @@ import {
   useUpdateFertilizerSchedule,
   useUpdateSpraySchedule,
 } from "../hooks/useQueries";
+import SharedPlotsTab from "./SharedPlotsTab";
 
 const _CROP_TYPES = [
   "Wheat",
@@ -1708,6 +1711,7 @@ function PlotCard({
   onViewSchedules,
   onDelete,
   onEdit,
+  onShare,
 }: {
   crop: Crop;
   index: number;
@@ -1718,6 +1722,7 @@ function PlotCard({
   onViewSchedules: (crop: Crop) => void;
   onDelete: (crop: Crop) => void;
   onEdit: (crop: Crop) => void;
+  onShare: (crop: Crop) => void;
 }) {
   return (
     <motion.div
@@ -1766,6 +1771,16 @@ function PlotCard({
             data-ocid="plots.delete_button"
           >
             <Trash2 className="w-4 h-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="w-8 h-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+            onClick={() => onShare(crop)}
+            data-ocid="plots.share_button"
+            title="Copy share link"
+          >
+            <Share2 className="w-4 h-4" />
           </Button>
         </div>
       </div>
@@ -1821,6 +1836,8 @@ function PlotCard({
 export default function PlotsPage() {
   const now = new Date();
   const { data: crops, isLoading } = useListCrops();
+  const { identity } = useInternetIdentity();
+
   const { data: fertSchedules } = useGetFertilizerSchedulesForMonth(
     now.getMonth() + 1,
     now.getFullYear(),
@@ -1836,6 +1853,23 @@ export default function PlotsPage() {
   const [editPlotName, setEditPlotName] = useState("");
   const { mutateAsync: deleteCrop } = useDeleteCrop();
   const { mutateAsync: updateCrop } = useUpdateCrop();
+
+  const handleShare = (crop: Crop) => {
+    const principal = identity?.getPrincipal().toText();
+    if (!principal) {
+      toast.error("Please log in to share a plot");
+      return;
+    }
+    const url = `${window.location.origin}/share?user=${principal}&plot=${encodeURIComponent(crop.plotName)}`;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        toast.success("Share link copied!");
+      })
+      .catch(() => {
+        toast.error("Failed to copy link");
+      });
+  };
 
   const handleEditPlot = async () => {
     if (!editTarget) return;
@@ -1908,105 +1942,144 @@ export default function PlotsPage() {
         transition={{ duration: 0.4 }}
       >
         {/* Page Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-display font-bold text-3xl mb-1">My Plots</h1>
-            <p className="text-muted-foreground">
-              View and manage fertilizer &amp; spray schedules per plot.
-            </p>
-          </div>
-          <Button
-            onClick={() => setAddPlotOpen(true)}
-            data-ocid="plots.open_modal_button"
-            className="rounded-full gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Add Plot
-          </Button>
+        <div className="mb-6">
+          <h1 className="font-display font-bold text-3xl mb-1">Plots</h1>
+          <p className="text-muted-foreground">
+            Manage your plots and collaborate with other farmers.
+          </p>
         </div>
 
-        {/* Loading */}
-        {isLoading && (
-          <div className="space-y-6" data-ocid="plots.loading_state">
-            {[1, 2].map((g) => (
-              <div key={g}>
-                <Skeleton className="h-6 w-32 mb-3 rounded-full" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-52 rounded-2xl" />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Empty */}
-        {!isLoading && (!crops || crops.length === 0) && (
-          <div
-            className="text-center py-20 rounded-2xl border border-dashed border-border"
-            data-ocid="plots.empty_state"
-          >
-            <MapPin className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-            <p className="font-semibold text-muted-foreground">No plots yet</p>
-            <p className="text-sm text-muted-foreground mt-1 mb-5">
-              Click "Add Plot" to register your first crop plot.
-            </p>
-            <Button
-              onClick={() => setAddPlotOpen(true)}
-              data-ocid="plots.primary_button"
-              className="rounded-full"
+        <Tabs defaultValue="my-plots" className="w-full">
+          <TabsList className="mb-6 w-full sm:w-auto">
+            <TabsTrigger
+              value="my-plots"
+              className="flex-1 sm:flex-none"
+              data-ocid="plots.tab"
             >
-              <Plus className="w-4 h-4 mr-2" /> Add Plot
-            </Button>
-          </div>
-        )}
+              My Plots
+            </TabsTrigger>
+            <TabsTrigger
+              value="shared-plots"
+              className="flex-1 sm:flex-none"
+              data-ocid="plots.tab"
+            >
+              Shared Plots
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Grouped by crop type */}
-        {!isLoading && crops && crops.length > 0 && (
-          <div className="space-y-10">
-            <AnimatePresence>
-              {Object.entries(grouped).map(([type, typeCrops]) => (
-                <motion.section
-                  key={type}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  data-ocid="plots.section"
+          <TabsContent value="my-plots">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="font-display font-bold text-xl mb-0.5">
+                  My Plots
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  View and manage fertilizer &amp; spray schedules per plot.
+                </p>
+              </div>
+              <Button
+                onClick={() => setAddPlotOpen(true)}
+                data-ocid="plots.open_modal_button"
+                className="rounded-full gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Plot
+              </Button>
+            </div>
+
+            {/* Loading */}
+            {isLoading && (
+              <div className="space-y-6" data-ocid="plots.loading_state">
+                {[1, 2].map((g) => (
+                  <div key={g}>
+                    <Skeleton className="h-6 w-32 mb-3 rounded-full" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-52 rounded-2xl" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Empty */}
+            {!isLoading && (!crops || crops.length === 0) && (
+              <div
+                className="text-center py-20 rounded-2xl border border-dashed border-border"
+                data-ocid="plots.empty_state"
+              >
+                <MapPin className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                <p className="font-semibold text-muted-foreground">
+                  No plots yet
+                </p>
+                <p className="text-sm text-muted-foreground mt-1 mb-5">
+                  Click "Add Plot" to register your first crop plot.
+                </p>
+                <Button
+                  onClick={() => setAddPlotOpen(true)}
+                  data-ocid="plots.primary_button"
+                  className="rounded-full"
                 >
-                  <div className="flex items-center gap-3 mb-4">
-                    <h2 className="font-display font-bold text-xl">{type}</h2>
-                    <Badge className="rounded-full bg-primary/10 text-primary border-primary/20">
-                      {typeCrops.length}{" "}
-                      {typeCrops.length === 1 ? "plot" : "plots"}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {typeCrops.map((crop) => {
-                      const idx = globalIndex++;
-                      return (
-                        <PlotCard
-                          key={crop.id.toString()}
-                          crop={crop}
-                          index={idx}
-                          fertilizerCount={getFertCount(crop.id)}
-                          sprayCount={getSprayCount(crop.id)}
-                          onAddFertilizer={setFertTarget}
-                          onAddSpray={setSprayTarget}
-                          onViewSchedules={setViewTarget}
-                          onDelete={setDeleteTarget}
-                          onEdit={(c) => {
-                            setEditTarget(c);
-                            setEditPlotName(c.plotName);
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                </motion.section>
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
+                  <Plus className="w-4 h-4 mr-2" /> Add Plot
+                </Button>
+              </div>
+            )}
+
+            {/* Grouped by crop type */}
+            {!isLoading && crops && crops.length > 0 && (
+              <div className="space-y-10">
+                <AnimatePresence>
+                  {Object.entries(grouped).map(([type, typeCrops]) => (
+                    <motion.section
+                      key={type}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      data-ocid="plots.section"
+                    >
+                      <div className="flex items-center gap-3 mb-4">
+                        <h2 className="font-display font-bold text-xl">
+                          {type}
+                        </h2>
+                        <Badge className="rounded-full bg-primary/10 text-primary border-primary/20">
+                          {typeCrops.length}{" "}
+                          {typeCrops.length === 1 ? "plot" : "plots"}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {typeCrops.map((crop) => {
+                          const idx = globalIndex++;
+                          return (
+                            <PlotCard
+                              key={crop.id.toString()}
+                              crop={crop}
+                              index={idx}
+                              fertilizerCount={getFertCount(crop.id)}
+                              sprayCount={getSprayCount(crop.id)}
+                              onAddFertilizer={setFertTarget}
+                              onAddSpray={setSprayTarget}
+                              onViewSchedules={setViewTarget}
+                              onDelete={setDeleteTarget}
+                              onEdit={(c) => {
+                                setEditTarget(c);
+                                setEditPlotName(c.plotName);
+                              }}
+                              onShare={handleShare}
+                            />
+                          );
+                        })}
+                      </div>
+                    </motion.section>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="shared-plots">
+            <SharedPlotsTab />
+          </TabsContent>
+        </Tabs>
       </motion.div>
 
       {/* Dialogs */}

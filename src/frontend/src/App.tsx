@@ -21,6 +21,7 @@ import DashboardPage from "./pages/DashboardPage";
 import MaterialsPage from "./pages/MaterialsPage";
 import PlotsPage from "./pages/PlotsPage";
 import SchedulePage from "./pages/SchedulePage";
+import SharePlotPage from "./pages/SharePlotPage";
 import SpraySchedulePage from "./pages/SpraySchedulePage";
 
 const queryClient = new QueryClient();
@@ -279,6 +280,12 @@ const materialsRoute = createRoute({
   ),
 });
 
+const shareRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/share",
+  component: SharePlotPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   dashboardRoute,
@@ -288,6 +295,7 @@ const routeTree = rootRoute.addChildren([
   sprayScheduleRoute,
   calendarRoute,
   materialsRoute,
+  shareRoute,
 ]);
 
 const router = createRouter({ routeTree });
