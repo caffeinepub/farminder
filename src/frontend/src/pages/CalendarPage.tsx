@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Droplets,
   Leaf,
   MapPin,
@@ -46,9 +48,24 @@ function extractQty(notes: string): string | null {
   );
 }
 
+function isPastDate(day: number, month: number, year: number): boolean {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(year, month, day);
+  return target < today;
+}
+
+function isTodayDate(day: number, month: number, year: number): boolean {
+  const today = new Date();
+  return (
+    day === today.getDate() &&
+    month === today.getMonth() &&
+    year === today.getFullYear()
+  );
+}
+
 type ViewMode = "year" | "month";
 
-// A compact mini-calendar card for a single month in year view
 function MiniMonthCard({
   year,
   month,
@@ -58,7 +75,7 @@ function MiniMonthCard({
   onClick,
 }: {
   year: number;
-  month: number; // 0-indexed
+  month: number;
   fertilizers: Array<{
     scheduledDate: { day: bigint; month: bigint; year: bigint };
   }>;
@@ -134,6 +151,7 @@ function MiniMonthCard({
           const hasFert = day ? fertDays.has(day) : false;
           const hasSpray = day ? sprayDays.has(day) : false;
           const isTodayCell = isThisMonthToday && day === todayDate;
+          const isPast = day ? isPastDate(day, month, year) : false;
           return (
             <div
               key={day !== null ? `day-${day}` : `empty-${idx}`}
@@ -143,16 +161,21 @@ function MiniMonthCard({
                 isTodayCell
                   ? "bg-primary/10 text-primary font-bold ring-1 ring-primary rounded"
                   : "",
+                isPast && day ? "opacity-60" : "",
               ].join(" ")}
             >
               {day && <span>{day}</span>}
               {day && (hasFert || hasSpray) && (
                 <div className="flex gap-px mt-px">
                   {hasFert && (
-                    <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                    <span
+                      className={`w-1 h-1 rounded-full ${isPast ? "bg-emerald-400" : "bg-emerald-500"}`}
+                    />
                   )}
                   {hasSpray && (
-                    <span className="w-1 h-1 rounded-full bg-blue-500" />
+                    <span
+                      className={`w-1 h-1 rounded-full ${isPast ? "bg-blue-400" : "bg-blue-500"}`}
+                    />
                   )}
                 </div>
               )}
@@ -164,13 +187,13 @@ function MiniMonthCard({
   );
 }
 
-// Grouped plot-wise task section
 function PlotTaskGroup({
   plotName,
   tasks,
   type,
   cropMap,
   baseIndex,
+  isCompleted,
 }: {
   plotName: string;
   tasks: Array<{
@@ -183,9 +206,13 @@ function PlotTaskGroup({
   type: "fertilizer" | "spray";
   cropMap: Record<string, string>;
   baseIndex: number;
+  isCompleted: boolean;
 }) {
-  const bgClass =
-    type === "fertilizer"
+  const bgClass = isCompleted
+    ? type === "fertilizer"
+      ? "bg-emerald-50/60 border-emerald-100/60"
+      : "bg-blue-50/60 border-blue-100/60"
+    : type === "fertilizer"
       ? "bg-emerald-50 border-emerald-100"
       : "bg-blue-50 border-blue-100";
   const badgeClass =
@@ -208,15 +235,36 @@ function PlotTaskGroup({
             <div
               key={String(task.id)}
               data-ocid={`calendar.row.${baseIndex + i + 1}`}
-              className={`flex items-center justify-between rounded-xl px-3 py-2.5 border ${bgClass}`}
+              className={`flex items-center justify-between rounded-xl px-3 py-2.5 border ${bgClass} ${isCompleted ? "opacity-80" : ""}`}
             >
-              <div>
-                <p className="font-medium text-sm text-foreground">{name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {cropMap[String(task.cropId)] ?? "Unknown Crop"}
-                </p>
+              <div className="flex items-center gap-2">
+                {isCompleted && (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                )}
+                <div>
+                  <p
+                    className={`font-medium text-sm ${isCompleted ? "text-muted-foreground" : "text-foreground"}`}
+                  >
+                    {name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {cropMap[String(task.cropId)] ?? "Unknown Crop"}
+                  </p>
+                </div>
               </div>
-              {qty && <Badge className={`text-xs ${badgeClass}`}>{qty}</Badge>}
+              <div className="flex items-center gap-2">
+                {qty && (
+                  <Badge className={`text-xs ${badgeClass}`}>{qty}</Badge>
+                )}
+                {isCompleted && (
+                  <Badge
+                    variant="outline"
+                    className="text-xs text-emerald-600 border-emerald-300"
+                  >
+                    Done
+                  </Badge>
+                )}
+              </div>
             </div>
           );
         })}
@@ -227,10 +275,12 @@ function PlotTaskGroup({
 
 export default function CalendarPage() {
   const today = new Date();
-  const [viewMode, setViewMode] = useState<ViewMode>("year");
+  const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-indexed
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [selectedDay, setSelectedDay] = useState<number | null>(
+    today.getDate(),
+  );
 
   const { data: crops = [], isLoading: cropsLoading } = useListCrops();
   const { data: fertilizers = [], isLoading: fertLoading } =
@@ -240,16 +290,13 @@ export default function CalendarPage() {
 
   const isLoading = cropsLoading || fertLoading || sprayLoading;
 
-  // cropId -> crop name
   const cropMap: Record<string, string> = {};
-  // cropId -> plot name
   const plotNameMap: Record<string, string> = {};
   for (const c of crops) {
     cropMap[String(c.id)] = c.name;
     plotNameMap[String(c.id)] = c.plotName || c.name;
   }
 
-  // Filter schedules for current viewMonth/viewYear
   const monthFerts = fertilizers.filter(
     (f) =>
       Number(f.scheduledDate.month) === viewMonth + 1 &&
@@ -261,7 +308,6 @@ export default function CalendarPage() {
       Number(s.scheduledDate.year) === viewYear,
   );
 
-  // Build day -> tasks map
   const fertsByDay: Record<number, typeof fertilizers> = {};
   const spraysByDay: Record<number, typeof sprays> = {};
   for (const f of monthFerts) {
@@ -275,7 +321,6 @@ export default function CalendarPage() {
     spraysByDay[d].push(s);
   }
 
-  // Calendar grid for detailed month view
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const cells: (number | null)[] = [
@@ -302,6 +347,12 @@ export default function CalendarPage() {
   const selectedFerts = selectedDay ? (fertsByDay[selectedDay] ?? []) : [];
   const selectedSprays = selectedDay ? (spraysByDay[selectedDay] ?? []) : [];
   const hasAnySchedule = fertilizers.length > 0 || sprays.length > 0;
+  const isSelectedDayToday = selectedDay
+    ? isTodayDate(selectedDay, viewMonth, viewYear)
+    : false;
+  const isSelectedDayCompleted = selectedDay
+    ? isPastDate(selectedDay, viewMonth, viewYear)
+    : false;
 
   const openMonthDetail = (month: number) => {
     setViewMonth(month);
@@ -309,7 +360,6 @@ export default function CalendarPage() {
     setViewMode("month");
   };
 
-  // Group by plot name
   function groupByPlot<T extends { cropId: bigint }>(
     items: T[],
   ): Record<string, T[]> {
@@ -327,7 +377,6 @@ export default function CalendarPage() {
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
           <CalendarDays className="w-5 h-5 text-white" />
@@ -368,7 +417,6 @@ export default function CalendarPage() {
         </div>
       ) : viewMode === "year" ? (
         <>
-          {/* Year navigation */}
           <div className="flex items-center justify-between mb-6">
             <Button
               variant="outline"
@@ -393,8 +441,7 @@ export default function CalendarPage() {
             </Button>
           </div>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 mb-5">
+          <div className="flex items-center gap-4 mb-5 flex-wrap">
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
               <span className="text-xs text-muted-foreground">Fertilizer</span>
@@ -403,12 +450,17 @@ export default function CalendarPage() {
               <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
               <span className="text-xs text-muted-foreground">Spray</span>
             </div>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+              <span className="text-xs text-muted-foreground">
+                Completed (past dates)
+              </span>
+            </div>
             <span className="text-xs text-muted-foreground ml-auto italic">
               Tap a month to view details
             </span>
           </div>
 
-          {/* 12 month grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {MONTHS.map((_, monthIdx) => (
               <MiniMonthCard
@@ -428,7 +480,6 @@ export default function CalendarPage() {
         </>
       ) : (
         <>
-          {/* Back to year view */}
           <div className="flex items-center gap-3 mb-6">
             <Button
               variant="outline"
@@ -468,8 +519,7 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-4 mb-4 flex-wrap">
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
               <span className="text-xs text-muted-foreground">Fertilizer</span>
@@ -478,9 +528,12 @@ export default function CalendarPage() {
               <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
               <span className="text-xs text-muted-foreground">Spray</span>
             </div>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+              <span className="text-xs text-muted-foreground">Completed</span>
+            </div>
           </div>
 
-          {/* Day headers */}
           <div className="grid grid-cols-7 mb-1">
             {DAYS.map((d) => (
               <div
@@ -492,7 +545,6 @@ export default function CalendarPage() {
             ))}
           </div>
 
-          {/* Calendar grid */}
           <div className="grid grid-cols-7 gap-1">
             {cells.map((day, idx) => {
               const hasFert = day ? (fertsByDay[day]?.length ?? 0) > 0 : false;
@@ -504,6 +556,7 @@ export default function CalendarPage() {
                 viewMonth === today.getMonth() &&
                 viewYear === today.getFullYear();
               const isSelected = day !== null && day === selectedDay;
+              const isPast = day ? isPastDate(day, viewMonth, viewYear) : false;
 
               return (
                 <button
@@ -522,33 +575,45 @@ export default function CalendarPage() {
                       ? "border-2 border-primary text-primary"
                       : "",
                     !isSelected && !isToday && day ? "text-foreground" : "",
+                    isPast && !isSelected && day ? "opacity-70" : "",
                   ].join(" ")}
                 >
                   {day && <span>{day}</span>}
-                  {day && (
+                  {day && (hasFert || hasSpray) && (
                     <div className="flex gap-0.5 mt-1">
                       {hasFert && (
                         <span
                           className={`w-2 h-2 rounded-full ${
-                            isSelected ? "bg-white" : "bg-emerald-500"
+                            isSelected
+                              ? "bg-white"
+                              : isPast
+                                ? "bg-emerald-400"
+                                : "bg-emerald-500"
                           }`}
                         />
                       )}
                       {hasSpray && (
                         <span
                           className={`w-2 h-2 rounded-full ${
-                            isSelected ? "bg-white/80" : "bg-blue-500"
+                            isSelected
+                              ? "bg-white/80"
+                              : isPast
+                                ? "bg-blue-400"
+                                : "bg-blue-500"
                           }`}
                         />
                       )}
                     </div>
+                  )}
+                  {/* Small checkmark for completed past dates */}
+                  {day && isPast && (hasFert || hasSpray) && !isSelected && (
+                    <CheckCircle2 className="absolute top-0.5 right-0.5 w-2.5 h-2.5 text-emerald-500" />
                   )}
                 </button>
               );
             })}
           </div>
 
-          {/* Day detail panel */}
           <AnimatePresence>
             {selectedDay !== null && (
               <motion.div
@@ -560,9 +625,30 @@ export default function CalendarPage() {
                 className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-sm"
                 data-ocid="calendar.panel"
               >
-                <h3 className="font-display font-bold text-lg mb-1">
-                  {MONTHS[viewMonth]} {selectedDay}, {viewYear}
-                </h3>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-display font-bold text-lg">
+                    {MONTHS[viewMonth]} {selectedDay}, {viewYear}
+                  </h3>
+                  {isSelectedDayToday ? (
+                    <Badge className="gap-1 bg-primary text-primary-foreground text-xs">
+                      <CalendarDays className="w-3 h-3" />
+                      Today
+                    </Badge>
+                  ) : isSelectedDayCompleted ? (
+                    <Badge className="gap-1 bg-emerald-100 text-emerald-700 border-emerald-300 text-xs">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Completed
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="gap-1 text-xs text-blue-600 border-blue-300"
+                    >
+                      <Clock className="w-3 h-3" />
+                      Upcoming
+                    </Badge>
+                  )}
+                </div>
 
                 {selectedFerts.length === 0 && selectedSprays.length === 0 ? (
                   <p
@@ -598,6 +684,7 @@ export default function CalendarPage() {
                                 type="fertilizer"
                                 cropMap={cropMap}
                                 baseIndex={baseIndex}
+                                isCompleted={isSelectedDayCompleted}
                               />
                             );
                           },
@@ -632,6 +719,7 @@ export default function CalendarPage() {
                                 type="spray"
                                 cropMap={cropMap}
                                 baseIndex={baseIndex}
+                                isCompleted={isSelectedDayCompleted}
                               />
                             );
                           },

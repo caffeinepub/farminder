@@ -44,6 +44,10 @@ export interface _SERVICE {
   'addSpraySchedule' : ActorMethod<[bigint, string, Date, string], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'deleteCrop' : ActorMethod<[bigint], undefined>,
+  'deleteFertilizerSchedule' : ActorMethod<[bigint], undefined>,
+  'deleteSpraySchedule' : ActorMethod<[bigint], undefined>,
+  'getAllFertilizerSchedules' : ActorMethod<[], Array<FertilizerSchedule>>,
+  'getAllSpraySchedules' : ActorMethod<[], Array<SpraySchedule>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getFertilizerSchedulesForMonth' : ActorMethod<
@@ -65,6 +69,15 @@ export interface _SERVICE {
   'markFertilizerScheduleAsDone' : ActorMethod<[bigint], undefined>,
   'markSprayScheduleAsDone' : ActorMethod<[bigint], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'updateCrop' : ActorMethod<[bigint, string, string, string], undefined>,
+  'updateFertilizerSchedule' : ActorMethod<
+    [bigint, string, Date, string],
+    undefined
+  >,
+  'updateSpraySchedule' : ActorMethod<
+    [bigint, string, Date, string],
+    undefined
+  >,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

@@ -4,34 +4,24 @@ import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
 
 module {
-  // Old types
-  type OldDate = {
+  type Date = {
     day : Nat;
     month : Nat;
     year : Nat;
   };
 
-  type OldFertilizerSchedule = {
-    id : Nat;
-    cropId : Nat;
-    fertilizerName : Text;
-    scheduledDate : OldDate;
-    notes : Text;
-    isDone : Bool;
-  };
-
-  // New types
   type Crop = {
     id : Nat;
     name : Text;
     cropType : Text;
+    plotName : Text;
   };
 
   type FertilizerSchedule = {
     id : Nat;
     cropId : Nat;
     fertilizerName : Text;
-    scheduledDate : OldDate;
+    scheduledDate : Date;
     notes : Text;
     isDone : Bool;
   };
@@ -40,7 +30,7 @@ module {
     id : Nat;
     cropId : Nat;
     sprayName : Text;
-    scheduledDate : OldDate;
+    scheduledDate : Date;
     notes : Text;
     isDone : Bool;
   };
@@ -51,31 +41,45 @@ module {
 
   type OldActor = {
     crops : Map.Map<Principal, List.List<Crop>>;
+    fertilizerSchedules : Map.Map<Principal, List.List<FertilizerSchedule>>;
     nextCropId : Nat;
-    nextScheduleId : Nat;
-    schedules : Map.Map<Principal, List.List<OldFertilizerSchedule>>;
+    nextFertilizerScheduleId : Nat;
+    nextSprayScheduleId : Nat;
+    spraySchedules : Map.Map<Principal, List.List<SpraySchedule>>;
+    stableCrops : [(Principal, [Crop])];
+    stableFertilizerSchedules : [(Principal, [FertilizerSchedule])];
+    stableNextCropId : Nat;
+    stableNextFertilizerScheduleId : Nat;
+    stableNextSprayScheduleId : Nat;
+    stableSpraySchedules : [(Principal, [SpraySchedule])];
+    stableUserProfiles : [(Principal, UserProfile)];
     userProfiles : Map.Map<Principal, UserProfile>;
   };
 
   type NewActor = {
-    crops : Map.Map<Principal, List.List<Crop>>;
-    fertilizerSchedules : Map.Map<Principal, List.List<FertilizerSchedule>>;
-    spraySchedules : Map.Map<Principal, List.List<SpraySchedule>>;
     userProfiles : Map.Map<Principal, UserProfile>;
-    nextCropId : Nat;
-    nextFertilizerScheduleId : Nat;
-    nextSprayScheduleId : Nat;
+    userCrops : Map.Map<Principal, List.List<Crop>>;
+    userFertilizerSchedules : Map.Map<Principal, List.List<FertilizerSchedule>>;
+    userSpraySchedules : Map.Map<Principal, List.List<SpraySchedule>>;
+    nextId : Nat;
   };
 
   public func run(old : OldActor) : NewActor {
     {
-      crops = old.crops;
-      fertilizerSchedules = old.schedules;
-      spraySchedules = Map.empty<Principal, List.List<SpraySchedule>>();
       userProfiles = old.userProfiles;
-      nextCropId = old.nextCropId;
-      nextFertilizerScheduleId = old.nextScheduleId;
-      nextSprayScheduleId = 0;
+      userCrops = old.crops;
+      userFertilizerSchedules = old.fertilizerSchedules;
+      userSpraySchedules = old.spraySchedules;
+      nextId = if (
+        old.nextCropId > old.nextFertilizerScheduleId and
+        old.nextCropId > old.nextSprayScheduleId
+      ) {
+        old.nextCropId + 1;
+      } else if (old.nextFertilizerScheduleId > old.nextSprayScheduleId) {
+        old.nextFertilizerScheduleId + 1;
+      } else {
+        old.nextSprayScheduleId + 1;
+      };
     };
   };
 };

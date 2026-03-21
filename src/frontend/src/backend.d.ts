@@ -37,33 +37,26 @@ export interface FertilizerSchedule {
 export interface UserProfile {
     name: string;
 }
-export enum UserRole {
-    admin = "admin",
-    user = "user",
-    guest = "guest"
-}
 export interface backendInterface {
     addCrop(name: string, cropType: string, plotName: string): Promise<bigint>;
-    addFertilizerSchedule(cropId: bigint, fertilizerName: string, scheduledDate: Date_, notes: string): Promise<bigint>;
-    addSpraySchedule(cropId: bigint, sprayName: string, scheduledDate: Date_, notes: string): Promise<bigint>;
-    updateFertilizerSchedule(scheduleId: bigint, fertilizerName: string, scheduledDate: Date_, notes: string): Promise<void>;
-    updateSpraySchedule(scheduleId: bigint, sprayName: string, scheduledDate: Date_, notes: string): Promise<void>;
-    deleteFertilizerSchedule(scheduleId: bigint): Promise<void>;
-    deleteSpraySchedule(scheduleId: bigint): Promise<void>;
-    getAllFertilizerSchedules(): Promise<Array<FertilizerSchedule>>;
-    getAllSpraySchedules(): Promise<Array<SpraySchedule>>;
-    assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
-    deleteCrop(cropId: bigint): Promise<void>;
-    getCallerUserProfile(): Promise<UserProfile | null>;
-    getCallerUserRole(): Promise<UserRole>;
-    getFertilizerSchedulesForMonth(month: bigint, year: bigint): Promise<Array<FertilizerSchedule>>;
-    getSpraySchedulesForMonth(month: bigint, year: bigint): Promise<Array<SpraySchedule>>;
-    getTodaysFertilizerSchedules(currentDate: Date_): Promise<Array<FertilizerSchedule>>;
-    getTodaysSpraySchedules(currentDate: Date_): Promise<Array<SpraySchedule>>;
-    getUserProfile(user: Principal): Promise<UserProfile | null>;
-    isCallerAdmin(): Promise<boolean>;
     listCrops(): Promise<Array<Crop>>;
+    updateCrop(cropId: bigint, name: string, cropType: string, plotName: string): Promise<void>;
+    deleteCrop(cropId: bigint): Promise<void>;
+    addFertilizerSchedule(cropId: bigint, fertilizerName: string, scheduledDate: Date_, notes: string): Promise<bigint>;
+    updateFertilizerSchedule(scheduleId: bigint, fertilizerName: string, scheduledDate: Date_, notes: string): Promise<void>;
+    deleteFertilizerSchedule(scheduleId: bigint): Promise<void>;
     markFertilizerScheduleAsDone(scheduleId: bigint): Promise<void>;
+    getFertilizerSchedulesForMonth(month: bigint, year: bigint): Promise<Array<FertilizerSchedule>>;
+    getTodaysFertilizerSchedules(today: Date_): Promise<Array<FertilizerSchedule>>;
+    getAllFertilizerSchedules(): Promise<Array<FertilizerSchedule>>;
+    addSpraySchedule(cropId: bigint, sprayName: string, scheduledDate: Date_, notes: string): Promise<bigint>;
+    updateSpraySchedule(scheduleId: bigint, sprayName: string, scheduledDate: Date_, notes: string): Promise<void>;
+    deleteSpraySchedule(scheduleId: bigint): Promise<void>;
     markSprayScheduleAsDone(scheduleId: bigint): Promise<void>;
+    getSpraySchedulesForMonth(month: bigint, year: bigint): Promise<Array<SpraySchedule>>;
+    getTodaysSpraySchedules(today: Date_): Promise<Array<SpraySchedule>>;
+    getAllSpraySchedules(): Promise<Array<SpraySchedule>>;
+    getCallerUserProfile(): Promise<UserProfile | null>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    getUserProfile(user: Principal): Promise<UserProfile | null>;
 }

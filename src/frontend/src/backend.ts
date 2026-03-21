@@ -131,18 +131,25 @@ export interface backendInterface {
     addSpraySchedule(cropId: bigint, sprayName: string, scheduledDate: Date_, notes: string): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     deleteCrop(cropId: bigint): Promise<void>;
+    deleteFertilizerSchedule(scheduleId: bigint): Promise<void>;
+    deleteSpraySchedule(scheduleId: bigint): Promise<void>;
+    getAllFertilizerSchedules(): Promise<Array<FertilizerSchedule>>;
+    getAllSpraySchedules(): Promise<Array<SpraySchedule>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getFertilizerSchedulesForMonth(month: bigint, year: bigint): Promise<Array<FertilizerSchedule>>;
     getSpraySchedulesForMonth(month: bigint, year: bigint): Promise<Array<SpraySchedule>>;
-    getTodaysFertilizerSchedules(currentDate: Date_): Promise<Array<FertilizerSchedule>>;
-    getTodaysSpraySchedules(currentDate: Date_): Promise<Array<SpraySchedule>>;
+    getTodaysFertilizerSchedules(today: Date_): Promise<Array<FertilizerSchedule>>;
+    getTodaysSpraySchedules(today: Date_): Promise<Array<SpraySchedule>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     listCrops(): Promise<Array<Crop>>;
     markFertilizerScheduleAsDone(scheduleId: bigint): Promise<void>;
     markSprayScheduleAsDone(scheduleId: bigint): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    updateCrop(cropId: bigint, name: string, cropType: string, plotName: string): Promise<void>;
+    updateFertilizerSchedule(scheduleId: bigint, fertilizerName: string, scheduledDate: Date_, notes: string): Promise<void>;
+    updateSpraySchedule(scheduleId: bigint, sprayName: string, scheduledDate: Date_, notes: string): Promise<void>;
 }
 import type { UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -228,6 +235,62 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.deleteCrop(arg0);
+            return result;
+        }
+    }
+    async deleteFertilizerSchedule(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteFertilizerSchedule(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteFertilizerSchedule(arg0);
+            return result;
+        }
+    }
+    async deleteSpraySchedule(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteSpraySchedule(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteSpraySchedule(arg0);
+            return result;
+        }
+    }
+    async getAllFertilizerSchedules(): Promise<Array<FertilizerSchedule>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllFertilizerSchedules();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllFertilizerSchedules();
+            return result;
+        }
+    }
+    async getAllSpraySchedules(): Promise<Array<SpraySchedule>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllSpraySchedules();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllSpraySchedules();
             return result;
         }
     }
@@ -396,6 +459,48 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.saveCallerUserProfile(arg0);
+            return result;
+        }
+    }
+    async updateCrop(arg0: bigint, arg1: string, arg2: string, arg3: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateCrop(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateCrop(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async updateFertilizerSchedule(arg0: bigint, arg1: string, arg2: Date_, arg3: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateFertilizerSchedule(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateFertilizerSchedule(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async updateSpraySchedule(arg0: bigint, arg1: string, arg2: Date_, arg3: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateSpraySchedule(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateSpraySchedule(arg0, arg1, arg2, arg3);
             return result;
         }
     }

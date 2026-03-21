@@ -18,7 +18,6 @@ export const UserRole = IDL.Variant({
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
-export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 export const FertilizerSchedule = IDL.Record({
   'id' : IDL.Nat,
   'fertilizerName' : IDL.Text,
@@ -35,6 +34,7 @@ export const SpraySchedule = IDL.Record({
   'notes' : IDL.Text,
   'sprayName' : IDL.Text,
 });
+export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 export const Crop = IDL.Record({
   'id' : IDL.Nat,
   'name' : IDL.Text,
@@ -57,6 +57,14 @@ export const idlService = IDL.Service({
     ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'deleteCrop' : IDL.Func([IDL.Nat], [], []),
+  'deleteFertilizerSchedule' : IDL.Func([IDL.Nat], [], []),
+  'deleteSpraySchedule' : IDL.Func([IDL.Nat], [], []),
+  'getAllFertilizerSchedules' : IDL.Func(
+      [],
+      [IDL.Vec(FertilizerSchedule)],
+      ['query'],
+    ),
+  'getAllSpraySchedules' : IDL.Func([], [IDL.Vec(SpraySchedule)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getFertilizerSchedulesForMonth' : IDL.Func(
@@ -89,6 +97,13 @@ export const idlService = IDL.Service({
   'markFertilizerScheduleAsDone' : IDL.Func([IDL.Nat], [], []),
   'markSprayScheduleAsDone' : IDL.Func([IDL.Nat], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'updateCrop' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text, IDL.Text], [], []),
+  'updateFertilizerSchedule' : IDL.Func(
+      [IDL.Nat, IDL.Text, Date, IDL.Text],
+      [],
+      [],
+    ),
+  'updateSpraySchedule' : IDL.Func([IDL.Nat, IDL.Text, Date, IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
@@ -104,7 +119,6 @@ export const idlFactory = ({ IDL }) => {
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
-  const UserProfile = IDL.Record({ 'name' : IDL.Text });
   const FertilizerSchedule = IDL.Record({
     'id' : IDL.Nat,
     'fertilizerName' : IDL.Text,
@@ -121,6 +135,7 @@ export const idlFactory = ({ IDL }) => {
     'notes' : IDL.Text,
     'sprayName' : IDL.Text,
   });
+  const UserProfile = IDL.Record({ 'name' : IDL.Text });
   const Crop = IDL.Record({
     'id' : IDL.Nat,
     'name' : IDL.Text,
@@ -143,6 +158,14 @@ export const idlFactory = ({ IDL }) => {
       ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'deleteCrop' : IDL.Func([IDL.Nat], [], []),
+    'deleteFertilizerSchedule' : IDL.Func([IDL.Nat], [], []),
+    'deleteSpraySchedule' : IDL.Func([IDL.Nat], [], []),
+    'getAllFertilizerSchedules' : IDL.Func(
+        [],
+        [IDL.Vec(FertilizerSchedule)],
+        ['query'],
+      ),
+    'getAllSpraySchedules' : IDL.Func([], [IDL.Vec(SpraySchedule)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getFertilizerSchedulesForMonth' : IDL.Func(
@@ -175,6 +198,17 @@ export const idlFactory = ({ IDL }) => {
     'markFertilizerScheduleAsDone' : IDL.Func([IDL.Nat], [], []),
     'markSprayScheduleAsDone' : IDL.Func([IDL.Nat], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'updateCrop' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text, IDL.Text], [], []),
+    'updateFertilizerSchedule' : IDL.Func(
+        [IDL.Nat, IDL.Text, Date, IDL.Text],
+        [],
+        [],
+      ),
+    'updateSpraySchedule' : IDL.Func(
+        [IDL.Nat, IDL.Text, Date, IDL.Text],
+        [],
+        [],
+      ),
   });
 };
 

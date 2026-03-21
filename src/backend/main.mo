@@ -5,8 +5,6 @@ import Principal "mo:core/Principal";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
-
-
 actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
@@ -47,19 +45,18 @@ actor {
   };
 
   // Stable storage for persistence across upgrades
-  var stableNextCropId : Nat = 0;
-  var stableNextFertilizerScheduleId : Nat = 0;
-  var stableNextSprayScheduleId : Nat = 0;
-  var stableCrops : [(Principal, [Crop])] = [];
-  var stableFertilizerSchedules : [(Principal, [FertilizerSchedule])] = [];
-  var stableSpraySchedules : [(Principal, [SpraySchedule])] = [];
-  var stableUserProfiles : [(Principal, UserProfile)] = [];
+  stable var stableNextCropId : Nat = 0;
+  stable var stableNextFertilizerScheduleId : Nat = 0;
+  stable var stableNextSprayScheduleId : Nat = 0;
+  stable var stableCrops : [(Principal, [Crop])] = [];
+  stable var stableFertilizerSchedules : [(Principal, [FertilizerSchedule])] = [];
+  stable var stableSpraySchedules : [(Principal, [SpraySchedule])] = [];
+  stable var stableUserProfiles : [(Principal, UserProfile)] = [];
 
   var nextCropId = stableNextCropId;
   var nextFertilizerScheduleId = stableNextFertilizerScheduleId;
   var nextSprayScheduleId = stableNextSprayScheduleId;
 
-  // Data stores per user (principal) - initialized from stable storage
   let crops = Map.empty<Principal, List.List<Crop>>();
   let fertilizerSchedules = Map.empty<Principal, List.List<FertilizerSchedule>>();
   let spraySchedules = Map.empty<Principal, List.List<SpraySchedule>>();
@@ -79,7 +76,6 @@ actor {
     userProfiles.add(p, profile);
   };
 
-  // Save data to stable storage before upgrade
   system func preupgrade() {
     stableNextCropId := nextCropId;
     stableNextFertilizerScheduleId := nextFertilizerScheduleId;
@@ -110,15 +106,38 @@ actor {
     stableUserProfiles := profileBuf.toArray();
   };
 
+  system func postupgrade() {
+    for ((p, arr) in stableCrops.vals()) {
+      crops.add(p, List.fromArray<Crop>(arr));
+    };
+    for ((p, arr) in stableFertilizerSchedules.vals()) {
+      fertilizerSchedules.add(p, List.fromArray<FertilizerSchedule>(arr));
+    };
+    for ((p, arr) in stableSpraySchedules.vals()) {
+      spraySchedules.add(p, List.fromArray<SpraySchedule>(arr));
+    };
+    for ((p, profile) in stableUserProfiles.vals()) {
+      userProfiles.add(p, profile);
+    };
+    nextCropId := stableNextCropId;
+    nextFertilizerScheduleId := stableNextFertilizerScheduleId;
+    nextSprayScheduleId := stableNextSprayScheduleId;
+  };
+
+  // Only blocks unauthenticated (anonymous) callers
+  func checkAnonymous(caller : Principal) {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Unauthorized: Must be logged in");
+    };
+  };
+
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     checkAnonymous(caller);
     userProfiles.get(caller);
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
-    };
+    checkAnonymous(caller);
     userProfiles.get(user);
   };
 
@@ -129,77 +148,54 @@ actor {
 
   public shared ({ caller }) func addCrop(name : Text, cropType : Text, plotName : Text) : async Nat {
     checkAnonymous(caller);
-
     let newCrop : Crop = {
       id = nextCropId;
       name;
       cropType;
       plotName;
     };
-
     let existingCrops = switch (crops.get(caller)) {
       case (null) { List.empty<Crop>() };
       case (?list) { list };
     };
-
     existingCrops.add(newCrop);
     crops.add(caller, existingCrops);
-
     nextCropId += 1;
     newCrop.id;
   };
 
   public query ({ caller }) func listCrops() : async [Crop] {
     checkAnonymous(caller);
-
-    let cropList = switch (crops.get(caller)) {
-      case (null) { List.empty<Crop>() };
-      case (?list) { list };
+    switch (crops.get(caller)) {
+      case (null) { [] };
+      case (?list) { list.toArray() };
     };
-    cropList.toArray();
   };
 
   public shared ({ caller }) func updateCrop(cropId : Nat, name : Text, cropType : Text, plotName : Text) : async () {
     checkAnonymous(caller);
-
     let cropList = switch (crops.get(caller)) {
       case (null) { Runtime.trap("No crops found for user") };
       case (?list) { list };
     };
-
-    let newList = cropList.map<Crop, Crop>(
-      func(crop) {
-        if (crop.id == cropId) {
-          { id = crop.id; name; cropType; plotName };
-        } else {
-          crop;
-        };
-      }
-    );
-
-    crops.add(caller, newList);
+    crops.add(caller, cropList.map<Crop, Crop>(func(c) {
+      if (c.id == cropId) { { id = c.id; name; cropType; plotName } } else { c };
+    }));
   };
 
   public shared ({ caller }) func deleteCrop(cropId : Nat) : async () {
     checkAnonymous(caller);
-
     let cropList = switch (crops.get(caller)) {
       case (null) { Runtime.trap("No crops found for user") };
       case (?list) { list };
     };
-
-    let newList = cropList.filter(func(crop) { crop.id != cropId });
-    crops.add(caller, newList);
+    crops.add(caller, cropList.filter(func(c) { c.id != cropId }));
   };
 
   public shared ({ caller }) func addFertilizerSchedule(
-    cropId : Nat,
-    fertilizerName : Text,
-    scheduledDate : Date,
-    notes : Text,
+    cropId : Nat, fertilizerName : Text, scheduledDate : Date, notes : Text,
   ) : async Nat {
     checkAnonymous(caller);
-
     let newSchedule : FertilizerSchedule = {
       id = nextFertilizerScheduleId;
       cropId;
@@ -208,72 +204,89 @@ actor {
       notes;
       isDone = false;
     };
-
-    let existingSchedules = switch (fertilizerSchedules.get(caller)) {
+    let existing = switch (fertilizerSchedules.get(caller)) {
       case (null) { List.empty<FertilizerSchedule>() };
       case (?list) { list };
     };
-
-    existingSchedules.add(newSchedule);
-    fertilizerSchedules.add(caller, existingSchedules);
-
+    existing.add(newSchedule);
+    fertilizerSchedules.add(caller, existing);
     nextFertilizerScheduleId += 1;
     newSchedule.id;
   };
 
   public shared ({ caller }) func updateFertilizerSchedule(
-    scheduleId : Nat,
-    fertilizerName : Text,
-    scheduledDate : Date,
-    notes : Text,
+    scheduleId : Nat, fertilizerName : Text, scheduledDate : Date, notes : Text,
   ) : async () {
     checkAnonymous(caller);
-
-    let scheduleList = switch (fertilizerSchedules.get(caller)) {
+    let list = switch (fertilizerSchedules.get(caller)) {
       case (null) { Runtime.trap("No schedules found for user") };
-      case (?list) { list };
+      case (?l) { l };
     };
-
-    let newList = scheduleList.map<FertilizerSchedule, FertilizerSchedule>(
-      func(schedule) {
-        if (schedule.id == scheduleId) {
-          {
-            id = schedule.id;
-            cropId = schedule.cropId;
-            fertilizerName;
-            scheduledDate;
-            notes;
-            isDone = schedule.isDone;
-          };
-        } else {
-          schedule;
-        };
-      }
-    );
-
-    fertilizerSchedules.add(caller, newList);
+    fertilizerSchedules.add(caller, list.map<FertilizerSchedule, FertilizerSchedule>(func(s) {
+      if (s.id == scheduleId) {
+        { id = s.id; cropId = s.cropId; fertilizerName; scheduledDate; notes; isDone = s.isDone };
+      } else { s };
+    }));
   };
 
   public shared ({ caller }) func deleteFertilizerSchedule(scheduleId : Nat) : async () {
     checkAnonymous(caller);
-
-    let scheduleList = switch (fertilizerSchedules.get(caller)) {
+    let list = switch (fertilizerSchedules.get(caller)) {
       case (null) { Runtime.trap("No schedules found for user") };
-      case (?list) { list };
+      case (?l) { l };
     };
+    fertilizerSchedules.add(caller, list.filter(func(s) { s.id != scheduleId }));
+  };
 
-    let newList = scheduleList.filter(func(s) { s.id != scheduleId });
-    fertilizerSchedules.add(caller, newList);
+  public shared ({ caller }) func markFertilizerScheduleAsDone(scheduleId : Nat) : async () {
+    checkAnonymous(caller);
+    let list = switch (fertilizerSchedules.get(caller)) {
+      case (null) { Runtime.trap("No schedules found for user") };
+      case (?l) { l };
+    };
+    fertilizerSchedules.add(caller, list.map<FertilizerSchedule, FertilizerSchedule>(func(s) {
+      if (s.id == scheduleId) {
+        { id = s.id; cropId = s.cropId; fertilizerName = s.fertilizerName; scheduledDate = s.scheduledDate; notes = s.notes; isDone = true };
+      } else { s };
+    }));
+  };
+
+  public query ({ caller }) func getFertilizerSchedulesForMonth(month : Nat, year : Nat) : async [FertilizerSchedule] {
+    checkAnonymous(caller);
+    switch (fertilizerSchedules.get(caller)) {
+      case (null) { [] };
+      case (?list) {
+        list.filter(func(s) { s.scheduledDate.month == month and s.scheduledDate.year == year }).toArray();
+      };
+    };
+  };
+
+  public query ({ caller }) func getTodaysFertilizerSchedules(currentDate : Date) : async [FertilizerSchedule] {
+    checkAnonymous(caller);
+    switch (fertilizerSchedules.get(caller)) {
+      case (null) { [] };
+      case (?list) {
+        list.filter(func(s) {
+          s.scheduledDate.day == currentDate.day and
+          s.scheduledDate.month == currentDate.month and
+          s.scheduledDate.year == currentDate.year
+        }).toArray();
+      };
+    };
+  };
+
+  public query ({ caller }) func getAllFertilizerSchedules() : async [FertilizerSchedule] {
+    checkAnonymous(caller);
+    switch (fertilizerSchedules.get(caller)) {
+      case (null) { [] };
+      case (?list) { list.toArray() };
+    };
   };
 
   public shared ({ caller }) func addSpraySchedule(
-    cropId : Nat,
-    sprayName : Text,
-    scheduledDate : Date,
-    notes : Text,
+    cropId : Nat, sprayName : Text, scheduledDate : Date, notes : Text,
   ) : async Nat {
     checkAnonymous(caller);
-
     let newSchedule : SpraySchedule = {
       id = nextSprayScheduleId;
       cropId;
@@ -282,218 +295,82 @@ actor {
       notes;
       isDone = false;
     };
-
-    let existingSchedules = switch (spraySchedules.get(caller)) {
+    let existing = switch (spraySchedules.get(caller)) {
       case (null) { List.empty<SpraySchedule>() };
       case (?list) { list };
     };
-
-    existingSchedules.add(newSchedule);
-    spraySchedules.add(caller, existingSchedules);
-
+    existing.add(newSchedule);
+    spraySchedules.add(caller, existing);
     nextSprayScheduleId += 1;
     newSchedule.id;
   };
 
   public shared ({ caller }) func updateSpraySchedule(
-    scheduleId : Nat,
-    sprayName : Text,
-    scheduledDate : Date,
-    notes : Text,
+    scheduleId : Nat, sprayName : Text, scheduledDate : Date, notes : Text,
   ) : async () {
     checkAnonymous(caller);
-
-    let scheduleList = switch (spraySchedules.get(caller)) {
+    let list = switch (spraySchedules.get(caller)) {
       case (null) { Runtime.trap("No spray schedules found for user") };
-      case (?list) { list };
+      case (?l) { l };
     };
-
-    let newList = scheduleList.map<SpraySchedule, SpraySchedule>(
-      func(schedule) {
-        if (schedule.id == scheduleId) {
-          {
-            id = schedule.id;
-            cropId = schedule.cropId;
-            sprayName;
-            scheduledDate;
-            notes;
-            isDone = schedule.isDone;
-          };
-        } else {
-          schedule;
-        };
-      }
-    );
-
-    spraySchedules.add(caller, newList);
+    spraySchedules.add(caller, list.map<SpraySchedule, SpraySchedule>(func(s) {
+      if (s.id == scheduleId) {
+        { id = s.id; cropId = s.cropId; sprayName; scheduledDate; notes; isDone = s.isDone };
+      } else { s };
+    }));
   };
 
   public shared ({ caller }) func deleteSpraySchedule(scheduleId : Nat) : async () {
     checkAnonymous(caller);
-
-    let scheduleList = switch (spraySchedules.get(caller)) {
+    let list = switch (spraySchedules.get(caller)) {
       case (null) { Runtime.trap("No spray schedules found for user") };
-      case (?list) { list };
+      case (?l) { l };
     };
-
-    let newList = scheduleList.filter(func(s) { s.id != scheduleId });
-    spraySchedules.add(caller, newList);
-  };
-
-  public query ({ caller }) func getFertilizerSchedulesForMonth(month : Nat, year : Nat) : async [FertilizerSchedule] {
-    checkAnonymous(caller);
-
-    let scheduleList = switch (fertilizerSchedules.get(caller)) {
-      case (null) { List.empty<FertilizerSchedule>() };
-      case (?list) { list };
-    };
-
-    let filtered = scheduleList.filter(
-      func(schedule) {
-        schedule.scheduledDate.month == month and schedule.scheduledDate.year == year
-      }
-    );
-
-    filtered.toArray();
-  };
-
-  public query ({ caller }) func getAllFertilizerSchedules() : async [FertilizerSchedule] {
-    checkAnonymous(caller);
-
-    let scheduleList = switch (fertilizerSchedules.get(caller)) {
-      case (null) { List.empty<FertilizerSchedule>() };
-      case (?list) { list };
-    };
-
-    scheduleList.toArray();
-  };
-
-  public query ({ caller }) func getAllSpraySchedules() : async [SpraySchedule] {
-    checkAnonymous(caller);
-
-    let scheduleList = switch (spraySchedules.get(caller)) {
-      case (null) { List.empty<SpraySchedule>() };
-      case (?list) { list };
-    };
-
-    scheduleList.toArray();
-  };
-
-  public query ({ caller }) func getTodaysFertilizerSchedules(currentDate : Date) : async [FertilizerSchedule] {
-    checkAnonymous(caller);
-
-    let scheduleList = switch (fertilizerSchedules.get(caller)) {
-      case (null) { List.empty<FertilizerSchedule>() };
-      case (?list) { list };
-    };
-
-    let filtered = scheduleList.filter(
-      func(schedule) {
-        schedule.scheduledDate.day == currentDate.day and
-        schedule.scheduledDate.month == currentDate.month and
-        schedule.scheduledDate.year == currentDate.year
-      }
-    );
-
-    filtered.toArray();
-  };
-
-  public shared ({ caller }) func markFertilizerScheduleAsDone(scheduleId : Nat) : async () {
-    checkAnonymous(caller);
-
-    let scheduleList = switch (fertilizerSchedules.get(caller)) {
-      case (null) { Runtime.trap("No schedules found for user") };
-      case (?list) { list };
-    };
-
-    let newList = scheduleList.map<FertilizerSchedule, FertilizerSchedule>(
-      func(schedule) {
-        if (schedule.id == scheduleId) {
-          {
-            id = schedule.id;
-            cropId = schedule.cropId;
-            fertilizerName = schedule.fertilizerName;
-            scheduledDate = schedule.scheduledDate;
-            notes = schedule.notes;
-            isDone = true;
-          };
-        } else {
-          schedule;
-        };
-      }
-    );
-
-    fertilizerSchedules.add(caller, newList);
-  };
-
-  public query ({ caller }) func getSpraySchedulesForMonth(month : Nat, year : Nat) : async [SpraySchedule] {
-    checkAnonymous(caller);
-
-    let scheduleList = switch (spraySchedules.get(caller)) {
-      case (null) { List.empty<SpraySchedule>() };
-      case (?list) { list };
-    };
-
-    let filtered = scheduleList.filter(
-      func(schedule) {
-        schedule.scheduledDate.month == month and schedule.scheduledDate.year == year
-      }
-    );
-
-    filtered.toArray();
-  };
-
-  public query ({ caller }) func getTodaysSpraySchedules(currentDate : Date) : async [SpraySchedule] {
-    checkAnonymous(caller);
-
-    let scheduleList = switch (spraySchedules.get(caller)) {
-      case (null) { List.empty<SpraySchedule>() };
-      case (?list) { list };
-    };
-
-    let filtered = scheduleList.filter(
-      func(schedule) {
-        schedule.scheduledDate.day == currentDate.day and
-        schedule.scheduledDate.month == currentDate.month and
-        schedule.scheduledDate.year == currentDate.year
-      }
-    );
-
-    filtered.toArray();
+    spraySchedules.add(caller, list.filter(func(s) { s.id != scheduleId }));
   };
 
   public shared ({ caller }) func markSprayScheduleAsDone(scheduleId : Nat) : async () {
     checkAnonymous(caller);
-
-    let scheduleList = switch (spraySchedules.get(caller)) {
+    let list = switch (spraySchedules.get(caller)) {
       case (null) { Runtime.trap("No spray schedules found for user") };
-      case (?list) { list };
+      case (?l) { l };
     };
-
-    let newList = scheduleList.map<SpraySchedule, SpraySchedule>(
-      func(schedule) {
-        if (schedule.id == scheduleId) {
-          {
-            id = schedule.id;
-            cropId = schedule.cropId;
-            sprayName = schedule.sprayName;
-            scheduledDate = schedule.scheduledDate;
-            notes = schedule.notes;
-            isDone = true;
-          };
-        } else {
-          schedule;
-        };
-      }
-    );
-
-    spraySchedules.add(caller, newList);
+    spraySchedules.add(caller, list.map<SpraySchedule, SpraySchedule>(func(s) {
+      if (s.id == scheduleId) {
+        { id = s.id; cropId = s.cropId; sprayName = s.sprayName; scheduledDate = s.scheduledDate; notes = s.notes; isDone = true };
+      } else { s };
+    }));
   };
 
-  // Only blocks anonymous (unauthenticated) callers
-  func checkAnonymous(caller : Principal) {
-    if (caller.isAnonymous()) {
-      Runtime.trap("Unauthorized: Must be logged in to perform this action");
+  public query ({ caller }) func getSpraySchedulesForMonth(month : Nat, year : Nat) : async [SpraySchedule] {
+    checkAnonymous(caller);
+    switch (spraySchedules.get(caller)) {
+      case (null) { [] };
+      case (?list) {
+        list.filter(func(s) { s.scheduledDate.month == month and s.scheduledDate.year == year }).toArray();
+      };
+    };
+  };
+
+  public query ({ caller }) func getTodaysSpraySchedules(currentDate : Date) : async [SpraySchedule] {
+    checkAnonymous(caller);
+    switch (spraySchedules.get(caller)) {
+      case (null) { [] };
+      case (?list) {
+        list.filter(func(s) {
+          s.scheduledDate.day == currentDate.day and
+          s.scheduledDate.month == currentDate.month and
+          s.scheduledDate.year == currentDate.year
+        }).toArray();
+      };
+    };
+  };
+
+  public query ({ caller }) func getAllSpraySchedules() : async [SpraySchedule] {
+    checkAnonymous(caller);
+    switch (spraySchedules.get(caller)) {
+      case (null) { [] };
+      case (?list) { list.toArray() };
     };
   };
 };
