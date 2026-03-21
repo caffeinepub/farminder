@@ -1,22 +1,26 @@
 # Farminder
 
 ## Current State
-The backend includes the `authorization` component (MixinAuthorization) which may be interfering with basic CRUD operations like addCrop. Users report being unable to add crops despite the function only checking for anonymous callers. The authorization mixin may introduce side effects that block logged-in users.
+Farminder has Dashboard, My Crops, Plots, and Calendar sections. Fertilizer and spray schedules are stored in the backend with name, date, cropId, and notes fields.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Nothing new
+- New "Materials" page at `/materials` showing current month's fertilizer and spray schedules in a 3-column card grid
+- Each card displays: material name (fertilizer/spray), date, plot name, quantity (from notes), and type badge (Fertilizer/Spray)
+- Cards sorted by date
+- Month navigation to view other months
+- Navigation link in Header
+- Route in App.tsx
 
 ### Modify
-- Remove authorization component from backend; replace with simple anonymous caller check built into the actor
-- Keep all existing crop, fertilizer schedule, and spray schedule functionality intact
-- Keep stable storage and pre/postupgrade for data persistence
+- Header: add Materials nav link
+- App.tsx: add materialsRoute
 
 ### Remove
-- authorization component dependency (MixinAuthorization, AccessControl imports)
-- Authorization-related backend methods (assignCallerUserRole, getCallerUserRole, isCallerAdmin)
+- Nothing
 
 ## Implementation Plan
-1. Rewrite main.mo without authorization imports, keeping all crop/schedule CRUD, stable storage, pre/postupgrade
-2. Update backend.d.ts to remove authorization-related types and methods
+1. Create `MaterialsPage.tsx` fetching current month fertilizer + spray schedules, joining with crops for plot name, displaying in 3-column responsive grid sorted by date
+2. Add route `/materials` in App.tsx
+3. Add Materials nav link in Header.tsx

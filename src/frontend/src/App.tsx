@@ -18,6 +18,7 @@ import { useGetCallerUserProfile } from "./hooks/useQueries";
 import CalendarPage from "./pages/CalendarPage";
 import CropsPage from "./pages/CropsPage";
 import DashboardPage from "./pages/DashboardPage";
+import MaterialsPage from "./pages/MaterialsPage";
 import PlotsPage from "./pages/PlotsPage";
 import SchedulePage from "./pages/SchedulePage";
 import SpraySchedulePage from "./pages/SpraySchedulePage";
@@ -268,6 +269,16 @@ const calendarRoute = createRoute({
   ),
 });
 
+const materialsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/materials",
+  component: () => (
+    <AuthGuard>
+      <MaterialsPage />
+    </AuthGuard>
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   dashboardRoute,
@@ -276,6 +287,7 @@ const routeTree = rootRoute.addChildren([
   scheduleRoute,
   sprayScheduleRoute,
   calendarRoute,
+  materialsRoute,
 ]);
 
 const router = createRouter({ routeTree });

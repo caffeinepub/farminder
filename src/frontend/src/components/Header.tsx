@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
-import { CalendarDays, Layers, Menu, X } from "lucide-react";
+import { CalendarDays, Layers, Menu, Package, X } from "lucide-react";
 import { useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { label: "My Crops", to: "/crops" },
   { label: "Plots", to: "/plots", icon: Layers },
   { label: "Calendar", to: "/calendar", icon: CalendarDays },
+  { label: "Materials", to: "/materials", icon: Package },
 ];
 
 export default function Header() {
