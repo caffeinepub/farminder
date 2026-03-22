@@ -3,6 +3,8 @@ import type {
   Crop,
   Date_,
   FertilizerSchedule,
+  SharedPlot,
+  SharedPlotSchedules,
   SpraySchedule,
   UserProfile,
 } from "../backend.d";
@@ -366,11 +368,11 @@ export function useMarkSprayScheduleAsDone() {
 
 export function useGetMySharedPlots() {
   const { actor, isFetching } = useActor();
-  return useQuery<any[]>({
+  return useQuery<SharedPlot[]>({
     queryKey: ["sharedPlots"],
     queryFn: async () => {
       if (!actor) return [];
-      return (actor as any).getMySharedPlots() as Promise<any[]>;
+      return (actor as any).getMySharedPlots() as Promise<SharedPlot[]>;
     },
     enabled: !!actor && !isFetching,
   });
@@ -436,13 +438,13 @@ export function useRemoveCollaborator() {
 
 export function useGetSharedPlotSchedules(sharedPlotId: bigint) {
   const { actor, isFetching } = useActor();
-  return useQuery<any>({
+  return useQuery<SharedPlotSchedules>({
     queryKey: ["sharedPlotSchedules", sharedPlotId.toString()],
     queryFn: async () => {
       if (!actor) return { fertilizerSchedules: [], spraySchedules: [] };
       return (actor as any).getSharedPlotSchedules(
         sharedPlotId,
-      ) as Promise<any>;
+      ) as Promise<SharedPlotSchedules>;
     },
     enabled: !!actor && !isFetching,
   });

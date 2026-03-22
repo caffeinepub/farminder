@@ -33,7 +33,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { Date_ } from "../backend.d";
+import type { Date_, SharedPlot } from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAddSharedFertilizerSchedule,
@@ -46,14 +46,6 @@ import {
   useInviteCollaborator,
   useRemoveCollaborator,
 } from "../hooks/useQueries";
-
-interface SharedPlot {
-  id: bigint;
-  cropName: string;
-  plotName: string;
-  owner: any;
-  collaborators: any[];
-}
 
 function dateToDate_(d: string): Date_ {
   const [year, month, day] = d.split("-").map(Number);
@@ -891,7 +883,7 @@ export default function SharedPlotsTab() {
           {sharedPlots.map((plot) => (
             <SharedPlotCard
               key={plot.id.toString()}
-              plot={plot as SharedPlot}
+              plot={plot}
               myPrincipal={myPrincipal}
             />
           ))}

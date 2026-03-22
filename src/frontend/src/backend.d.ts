@@ -42,6 +42,35 @@ export interface PlotShareData {
     fertilizerSchedules: Array<FertilizerSchedule>;
     spraySchedules: Array<SpraySchedule>;
 }
+export interface SharedPlot {
+    id: bigint;
+    cropName: string;
+    plotName: string;
+    owner: Principal;
+    collaborators: Array<Principal>;
+}
+export interface SharedFertilizerSchedule {
+    id: bigint;
+    sharedPlotId: bigint;
+    fertilizerName: string;
+    quantity: string;
+    scheduledDate: Date_;
+    notes: string;
+    addedBy: Principal;
+}
+export interface SharedSpraySchedule {
+    id: bigint;
+    sharedPlotId: bigint;
+    sprayName: string;
+    quantity: string;
+    scheduledDate: Date_;
+    notes: string;
+    addedBy: Principal;
+}
+export interface SharedPlotSchedules {
+    fertilizerSchedules: Array<SharedFertilizerSchedule>;
+    spraySchedules: Array<SharedSpraySchedule>;
+}
 export interface backendInterface {
     addCrop(name: string, cropType: string, plotName: string): Promise<bigint>;
     listCrops(): Promise<Array<Crop>>;
@@ -65,4 +94,13 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getPlotSchedulesPublic(userPrincipal: Principal, plotName: string): Promise<PlotShareData>;
+    createSharedPlot(cropName: string, plotName: string): Promise<bigint>;
+    inviteCollaborator(sharedPlotId: bigint, collaborator: Principal): Promise<void>;
+    removeCollaborator(sharedPlotId: bigint, collaborator: Principal): Promise<void>;
+    getMySharedPlots(): Promise<Array<SharedPlot>>;
+    addSharedFertilizerSchedule(sharedPlotId: bigint, fertilizerName: string, quantity: string, scheduledDate: Date_, notes: string): Promise<bigint>;
+    deleteSharedFertilizerSchedule(sharedPlotId: bigint, scheduleId: bigint): Promise<void>;
+    addSharedSpraySchedule(sharedPlotId: bigint, sprayName: string, quantity: string, scheduledDate: Date_, notes: string): Promise<bigint>;
+    deleteSharedSpraySchedule(sharedPlotId: bigint, scheduleId: bigint): Promise<void>;
+    getSharedPlotSchedules(sharedPlotId: bigint): Promise<SharedPlotSchedules>;
 }
