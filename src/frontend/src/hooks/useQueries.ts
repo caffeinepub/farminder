@@ -549,3 +549,35 @@ export function useDeleteSharedSpraySchedule() {
     },
   });
 }
+
+export function useDeleteSharedPlot() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ sharedPlotId }: { sharedPlotId: bigint }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).deleteSharedPlot(sharedPlotId) as Promise<void>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sharedPlots"] }),
+  });
+}
+
+export function useRenameSharedPlot() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sharedPlotId,
+      newCropName,
+      newPlotName,
+    }: { sharedPlotId: bigint; newCropName: string; newPlotName: string }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).renameSharedPlot(
+        sharedPlotId,
+        newCropName,
+        newPlotName,
+      ) as Promise<void>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sharedPlots"] }),
+  });
+}

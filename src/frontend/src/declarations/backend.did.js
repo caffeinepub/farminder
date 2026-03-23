@@ -152,6 +152,8 @@ export const idlService = IDL.Service({
     ),
   'deleteSharedSpraySchedule' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
   'getSharedPlotSchedules' : IDL.Func([IDL.Nat], [SharedPlotSchedules], ['query']),
+  'deleteSharedPlot' : IDL.Func([IDL.Nat], [], []),
+  'renameSharedPlot' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
@@ -309,6 +311,8 @@ export const idlFactory = ({ IDL }) => {
       ),
     'deleteSharedSpraySchedule' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
     'getSharedPlotSchedules' : IDL.Func([IDL.Nat], [SharedPlotSchedules], ['query']),
+    'deleteSharedPlot' : IDL.Func([IDL.Nat], [], []),
+    'renameSharedPlot' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text], [], []),
   });
 };
 

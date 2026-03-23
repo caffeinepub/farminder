@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useQueries } from "@tanstack/react-query";
 import {
   CalendarDays,
   CheckCircle2,
@@ -13,9 +14,11 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import { useActor } from "../hooks/useActor";
 import {
   useGetAllFertilizerSchedules,
   useGetAllSpraySchedules,
+  useGetMySharedPlots,
   useListCrops,
 } from "../hooks/useQueries";
 
@@ -65,6 +68,17 @@ function isTodayDate(day: number, month: number, year: number): boolean {
 }
 
 type ViewMode = "year" | "month";
+
+type ScheduleItem = {
+  id: bigint;
+  cropId: bigint;
+  notes: string;
+  scheduledDate: { day: bigint; month: bigint; year: bigint };
+  fertilizerName?: string;
+  sprayName?: string;
+  isShared?: boolean;
+  sharedPlotName?: string;
+};
 
 function MiniMonthCard({
   year,
@@ -194,19 +208,15 @@ function PlotTaskGroup({
   cropMap,
   baseIndex,
   isCompleted,
+  isShared,
 }: {
   plotName: string;
-  tasks: Array<{
-    id: bigint;
-    fertilizerName?: string;
-    sprayName?: string;
-    cropId: bigint;
-    notes: string;
-  }>;
+  tasks: ScheduleItem[];
   type: "fertilizer" | "spray";
   cropMap: Record<string, string>;
   baseIndex: number;
   isCompleted: boolean;
+  isShared?: boolean;
 }) {
   const bgClass = isCompleted
     ? type === "fertilizer"
@@ -225,12 +235,20 @@ function PlotTaskGroup({
       <div className="flex items-center gap-1.5 mb-2 px-1">
         <MapPin className="w-3 h-3 text-muted-foreground" />
         <span className="text-xs font-bold text-foreground">{plotName}</span>
+        {isShared && (
+          <Badge className="bg-purple-100 text-purple-700 border border-purple-300 text-xs px-1.5 py-0">
+            Shared
+          </Badge>
+        )}
       </div>
       <div className="space-y-1.5 pl-4">
         {tasks.map((task, i) => {
           const qty = extractQty(task.notes);
           const name =
             type === "fertilizer" ? task.fertilizerName! : task.sprayName!;
+          const cropLabel = task.isShared
+            ? (task.sharedPlotName ?? plotName)
+            : (cropMap[String(task.cropId)] ?? "Unknown Crop");
           return (
             <div
               key={String(task.id)}
@@ -247,9 +265,7 @@ function PlotTaskGroup({
                   >
                     {name}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {cropMap[String(task.cropId)] ?? "Unknown Crop"}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{cropLabel}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -283,10 +299,62 @@ export default function CalendarPage() {
   );
 
   const { data: crops = [], isLoading: cropsLoading } = useListCrops();
-  const { data: fertilizers = [], isLoading: fertLoading } =
+  const { data: fertilizersRaw = [], isLoading: fertLoading } =
     useGetAllFertilizerSchedules();
-  const { data: sprays = [], isLoading: sprayLoading } =
+  const { data: spraysRaw = [], isLoading: sprayLoading } =
     useGetAllSpraySchedules();
+
+  const { data: sharedPlots } = useGetMySharedPlots();
+  const { actor } = useActor();
+
+  const sharedSchedulesQueries = useQueries({
+    queries: (sharedPlots ?? []).map((plot) => ({
+      queryKey: ["sharedPlotSchedules", plot.id.toString()],
+      queryFn: async () => {
+        if (!actor) return { fertilizerSchedules: [], spraySchedules: [] };
+        return (actor as any).getSharedPlotSchedules(plot.id) as Promise<{
+          fertilizerSchedules: any[];
+          spraySchedules: any[];
+        }>;
+      },
+      enabled: !!actor && !!sharedPlots,
+    })),
+  });
+
+  // Build combined fertilizers and sprays including shared plot schedules
+  const sharedFerts: ScheduleItem[] = [];
+  const sharedSprays: ScheduleItem[] = [];
+  for (let i = 0; i < sharedSchedulesQueries.length; i++) {
+    const result = sharedSchedulesQueries[i].data;
+    const plot = sharedPlots?.[i];
+    if (!result || !plot) continue;
+    const plotLabel = `${plot.cropName} - ${plot.plotName}`;
+    for (const f of result.fertilizerSchedules) {
+      sharedFerts.push({
+        ...f,
+        isShared: true,
+        sharedPlotName: plotLabel,
+        cropId: BigInt(`999${i}`),
+      });
+    }
+    for (const s of result.spraySchedules) {
+      sharedSprays.push({
+        ...s,
+        isShared: true,
+        sharedPlotName: plotLabel,
+        cropId: BigInt(`999${i}`),
+      });
+    }
+  }
+
+  const fertilizers: ScheduleItem[] = [
+    ...(fertilizersRaw as ScheduleItem[]),
+    ...sharedFerts,
+  ];
+  const sprays: ScheduleItem[] = [
+    ...(spraysRaw as ScheduleItem[]),
+    ...sharedSprays,
+  ];
 
   const isLoading = cropsLoading || fertLoading || sprayLoading;
 
@@ -308,8 +376,8 @@ export default function CalendarPage() {
       Number(s.scheduledDate.year) === viewYear,
   );
 
-  const fertsByDay: Record<number, typeof fertilizers> = {};
-  const spraysByDay: Record<number, typeof sprays> = {};
+  const fertsByDay: Record<number, ScheduleItem[]> = {};
+  const spraysByDay: Record<number, ScheduleItem[]> = {};
   for (const f of monthFerts) {
     const d = Number(f.scheduledDate.day);
     if (!fertsByDay[d]) fertsByDay[d] = [];
@@ -360,12 +428,12 @@ export default function CalendarPage() {
     setViewMode("month");
   };
 
-  function groupByPlot<T extends { cropId: bigint }>(
-    items: T[],
-  ): Record<string, T[]> {
-    const groups: Record<string, T[]> = {};
+  function groupByPlot(items: ScheduleItem[]): Record<string, ScheduleItem[]> {
+    const groups: Record<string, ScheduleItem[]> = {};
     for (const item of items) {
-      const plotName = plotNameMap[String(item.cropId)] || "Unknown Plot";
+      const plotName = item.isShared
+        ? (item.sharedPlotName ?? "Shared Plot")
+        : plotNameMap[String(item.cropId)] || "Unknown Plot";
       if (!groups[plotName]) groups[plotName] = [];
       groups[plotName].push(item);
     }
@@ -532,6 +600,12 @@ export default function CalendarPage() {
               <CheckCircle2 className="w-3 h-3 text-emerald-500" />
               <span className="text-xs text-muted-foreground">Completed</span>
             </div>
+            <div className="flex items-center gap-1.5">
+              <Badge className="bg-purple-100 text-purple-700 border border-purple-300 text-xs px-1.5 py-0">
+                Shared
+              </Badge>
+              <span className="text-xs text-muted-foreground">Shared Plot</span>
+            </div>
           </div>
 
           <div className="grid grid-cols-7 mb-1">
@@ -676,15 +750,17 @@ export default function CalendarPage() {
                             const baseIndex = Object.values(fertsByPlot)
                               .slice(0, gi)
                               .reduce((acc, g) => acc + g.length, 0);
+                            const isSharedGroup = tasks.some((t) => t.isShared);
                             return (
                               <PlotTaskGroup
                                 key={plotName}
                                 plotName={plotName}
-                                tasks={tasks as any}
+                                tasks={tasks}
                                 type="fertilizer"
                                 cropMap={cropMap}
                                 baseIndex={baseIndex}
                                 isCompleted={isSelectedDayCompleted}
+                                isShared={isSharedGroup}
                               />
                             );
                           },
@@ -711,15 +787,17 @@ export default function CalendarPage() {
                               Object.values(spraysByPlot)
                                 .slice(0, gi)
                                 .reduce((acc, g) => acc + g.length, 0);
+                            const isSharedGroup = tasks.some((t) => t.isShared);
                             return (
                               <PlotTaskGroup
                                 key={plotName}
                                 plotName={plotName}
-                                tasks={tasks as any}
+                                tasks={tasks}
                                 type="spray"
                                 cropMap={cropMap}
                                 baseIndex={baseIndex}
                                 isCompleted={isSelectedDayCompleted}
+                                isShared={isSharedGroup}
                               />
                             );
                           },

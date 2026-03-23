@@ -504,6 +504,67 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getPlotSchedulesPublic(arg0, arg1) {
+        if (this.processError) {
+            try { return await this.actor.getPlotSchedulesPublic(arg0, arg1); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.getPlotSchedulesPublic(arg0, arg1); }
+    }
+    async createSharedPlot(arg0, arg1) {
+        if (this.processError) {
+            try { return await this.actor.createSharedPlot(arg0, arg1); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.createSharedPlot(arg0, arg1); }
+    }
+    async inviteCollaborator(arg0, arg1) {
+        if (this.processError) {
+            try { await this.actor.inviteCollaborator(arg0, arg1); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { await this.actor.inviteCollaborator(arg0, arg1); }
+    }
+    async removeCollaborator(arg0, arg1) {
+        if (this.processError) {
+            try { await this.actor.removeCollaborator(arg0, arg1); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { await this.actor.removeCollaborator(arg0, arg1); }
+    }
+    async getMySharedPlots() {
+        if (this.processError) {
+            try { return await this.actor.getMySharedPlots(); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.getMySharedPlots(); }
+    }
+    async addSharedFertilizerSchedule(arg0, arg1, arg2, arg3, arg4) {
+        if (this.processError) {
+            try { return await this.actor.addSharedFertilizerSchedule(arg0, arg1, arg2, arg3, arg4); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.addSharedFertilizerSchedule(arg0, arg1, arg2, arg3, arg4); }
+    }
+    async deleteSharedFertilizerSchedule(arg0, arg1) {
+        if (this.processError) {
+            try { await this.actor.deleteSharedFertilizerSchedule(arg0, arg1); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { await this.actor.deleteSharedFertilizerSchedule(arg0, arg1); }
+    }
+    async addSharedSpraySchedule(arg0, arg1, arg2, arg3, arg4) {
+        if (this.processError) {
+            try { return await this.actor.addSharedSpraySchedule(arg0, arg1, arg2, arg3, arg4); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.addSharedSpraySchedule(arg0, arg1, arg2, arg3, arg4); }
+    }
+    async deleteSharedSpraySchedule(arg0, arg1) {
+        if (this.processError) {
+            try { await this.actor.deleteSharedSpraySchedule(arg0, arg1); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { await this.actor.deleteSharedSpraySchedule(arg0, arg1); }
+    }
+    async getSharedPlotSchedules(arg0) {
+        if (this.processError) {
+            try { return await this.actor.getSharedPlotSchedules(arg0); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.getSharedPlotSchedules(arg0); }
+    }
+    async deleteSharedPlot(arg0) {
+        if (this.processError) {
+            try { return await this.actor.deleteSharedPlot(arg0); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.deleteSharedPlot(arg0); }
+    }
+    async renameSharedPlot(arg0, arg1, arg2) {
+        if (this.processError) {
+            try { return await this.actor.renameSharedPlot(arg0, arg1, arg2); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.renameSharedPlot(arg0, arg1, arg2); }
+    }
+
 }
 function from_candid_UserRole_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
     return from_candid_variant_n5(_uploadFile, _downloadFile, value);

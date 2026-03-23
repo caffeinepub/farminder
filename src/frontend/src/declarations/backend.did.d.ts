@@ -118,6 +118,8 @@ export interface _SERVICE {
   'addSharedSpraySchedule' : ActorMethod<[bigint, string, string, Date, string], bigint>,
   'deleteSharedSpraySchedule' : ActorMethod<[bigint, bigint], undefined>,
   'getSharedPlotSchedules' : ActorMethod<[bigint], SharedPlotSchedules>,
+  'deleteSharedPlot' : ActorMethod<[bigint], undefined>,
+  'renameSharedPlot' : ActorMethod<[bigint, string, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

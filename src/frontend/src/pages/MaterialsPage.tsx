@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useQueries } from "@tanstack/react-query";
 import {
   CalendarDays,
   ChevronLeft,
@@ -7,11 +8,14 @@ import {
   FlaskConical,
   MapPin,
   Package,
+  Users,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { useActor } from "../hooks/useActor";
 import {
   useGetFertilizerSchedulesForMonth,
+  useGetMySharedPlots,
   useGetSpraySchedulesForMonth,
   useListCrops,
 } from "../hooks/useQueries";
@@ -37,12 +41,14 @@ type MaterialItem = {
   id: string;
   type: "Fertilizer" | "Spray";
   name: string;
+  quantity?: string;
   day: number;
   month: number;
   year: number;
   plotName: string;
   notes: string;
-  isDone: boolean;
+  isDone?: boolean;
+  isShared?: boolean;
 };
 
 export default function MaterialsPage() {
@@ -55,6 +61,28 @@ export default function MaterialsPage() {
   const { data: sprays, isLoading: sprayLoading } =
     useGetSpraySchedulesForMonth(selectedMonth, selectedYear);
   const { data: crops } = useListCrops();
+  const { data: sharedPlots, isLoading: sharedPlotsLoading } =
+    useGetMySharedPlots();
+  const { actor } = useActor();
+
+  // Fetch schedules for all shared plots in parallel
+  const sharedSchedulesQueries = useQueries({
+    queries: (sharedPlots ?? []).map((plot) => ({
+      queryKey: ["sharedPlotSchedules", plot.id.toString()],
+      queryFn: async () => {
+        if (!actor) return { fertilizerSchedules: [], spraySchedules: [] };
+        return (actor as any).getSharedPlotSchedules(plot.id) as Promise<{
+          fertilizerSchedules: any[];
+          spraySchedules: any[];
+        }>;
+      },
+      enabled: !!actor && !!sharedPlots,
+    })),
+  });
+
+  const sharedSchedulesLoading = sharedSchedulesQueries.some(
+    (q) => q.isLoading,
+  );
 
   const cropMap = new Map<string, string>();
   if (crops) {
@@ -65,6 +93,7 @@ export default function MaterialsPage() {
 
   const items: MaterialItem[] = [];
 
+  // Own fertilizers
   if (fertilizers) {
     for (const f of fertilizers) {
       items.push({
@@ -77,10 +106,12 @@ export default function MaterialsPage() {
         plotName: cropMap.get(String(f.cropId)) ?? "Unknown Plot",
         notes: f.notes,
         isDone: f.isDone,
+        isShared: false,
       });
     }
   }
 
+  // Own sprays
   if (sprays) {
     for (const s of sprays) {
       items.push({
@@ -93,13 +124,62 @@ export default function MaterialsPage() {
         plotName: cropMap.get(String(s.cropId)) ?? "Unknown Plot",
         notes: s.notes,
         isDone: s.isDone,
+        isShared: false,
       });
     }
   }
 
+  // Shared plot fertilizers and sprays
+  if (sharedPlots) {
+    sharedPlots.forEach((plot, idx) => {
+      const queryResult = sharedSchedulesQueries[idx];
+      const schedules = queryResult?.data;
+      if (!schedules) return;
+
+      for (const f of schedules.fertilizerSchedules) {
+        const month = Number(f.scheduledDate.month);
+        const year = Number(f.scheduledDate.year);
+        if (month === selectedMonth && year === selectedYear) {
+          items.push({
+            id: `sf-${plot.id}-${f.id}`,
+            type: "Fertilizer",
+            name: f.fertilizerName,
+            quantity: f.quantity,
+            day: Number(f.scheduledDate.day),
+            month,
+            year,
+            plotName: `${plot.plotName} (Shared)`,
+            notes: f.notes,
+            isShared: true,
+          });
+        }
+      }
+
+      for (const s of schedules.spraySchedules) {
+        const month = Number(s.scheduledDate.month);
+        const year = Number(s.scheduledDate.year);
+        if (month === selectedMonth && year === selectedYear) {
+          items.push({
+            id: `ss-${plot.id}-${s.id}`,
+            type: "Spray",
+            name: s.sprayName,
+            quantity: s.quantity,
+            day: Number(s.scheduledDate.day),
+            month,
+            year,
+            plotName: `${plot.plotName} (Shared)`,
+            notes: s.notes,
+            isShared: true,
+          });
+        }
+      }
+    });
+  }
+
   items.sort((a, b) => a.day - b.day);
 
-  const isLoading = fertLoading || sprayLoading;
+  const isLoading =
+    fertLoading || sprayLoading || sharedPlotsLoading || sharedSchedulesLoading;
 
   const goToPrevMonth = () => {
     if (selectedMonth === 1) {
@@ -181,6 +261,12 @@ export default function MaterialsPage() {
             {items.filter((i) => i.type === "Spray").length} Spray
             {items.filter((i) => i.type === "Spray").length !== 1 ? "s" : ""}
           </span>
+          {items.some((i) => i.isShared) && (
+            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+              <Users className="w-3 h-3" />
+              Includes shared plots
+            </span>
+          )}
         </div>
       )}
 
@@ -236,6 +322,7 @@ export default function MaterialsPage() {
           {items.map((item, idx) => {
             const isFert = item.type === "Fertilizer";
             const isPast = item.isDone;
+            const displayQty = item.quantity || item.notes;
 
             return (
               <motion.div
@@ -248,9 +335,11 @@ export default function MaterialsPage() {
                   isPast ? "opacity-70" : ""
                 }`}
                 style={{
-                  borderColor: isFert
-                    ? "oklch(0.85 0.10 140)"
-                    : "oklch(0.82 0.08 250)",
+                  borderColor: item.isShared
+                    ? "oklch(0.82 0.10 290)"
+                    : isFert
+                      ? "oklch(0.85 0.10 140)"
+                      : "oklch(0.82 0.08 250)",
                 }}
               >
                 {/* Done ribbon */}
@@ -260,8 +349,8 @@ export default function MaterialsPage() {
                   </span>
                 )}
 
-                {/* Badge */}
-                <div>
+                {/* Badges row */}
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <Badge
                     className={`text-xs font-semibold rounded-full px-2.5 py-0.5 ${
                       isFert
@@ -272,6 +361,15 @@ export default function MaterialsPage() {
                   >
                     {item.type}
                   </Badge>
+                  {item.isShared && (
+                    <Badge
+                      className="text-xs font-semibold rounded-full px-2.5 py-0.5 bg-purple-100 text-purple-700 border-purple-200"
+                      variant="outline"
+                    >
+                      <Users className="w-3 h-3 mr-1" />
+                      Shared
+                    </Badge>
+                  )}
                 </div>
 
                 {/* Name */}
@@ -300,7 +398,7 @@ export default function MaterialsPage() {
                 </div>
 
                 {/* Qty / Notes */}
-                {item.notes && (
+                {displayQty && (
                   <div className="flex items-start gap-2 text-sm text-muted-foreground">
                     <FlaskConical
                       className="w-4 h-4 flex-shrink-0 mt-0.5"
@@ -308,9 +406,9 @@ export default function MaterialsPage() {
                     />
                     <span>
                       <span className="font-medium text-foreground">
-                        Qty/Notes:{" "}
+                        {item.quantity ? "Qty: " : "Notes: "}
                       </span>
-                      {item.notes}
+                      {displayQty}
                     </span>
                   </div>
                 )}

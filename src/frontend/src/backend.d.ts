@@ -103,4 +103,6 @@ export interface backendInterface {
     addSharedSpraySchedule(sharedPlotId: bigint, sprayName: string, quantity: string, scheduledDate: Date_, notes: string): Promise<bigint>;
     deleteSharedSpraySchedule(sharedPlotId: bigint, scheduleId: bigint): Promise<void>;
     getSharedPlotSchedules(sharedPlotId: bigint): Promise<SharedPlotSchedules>;
+    deleteSharedPlot(sharedPlotId: bigint): Promise<void>;
+    renameSharedPlot(sharedPlotId: bigint, newCropName: string, newPlotName: string): Promise<void>;
 }

@@ -23,6 +23,7 @@ import {
   Copy,
   FlaskConical,
   Loader2,
+  Pencil,
   Plus,
   Sprout,
   Trash2,
@@ -40,11 +41,13 @@ import {
   useAddSharedSpraySchedule,
   useCreateSharedPlot,
   useDeleteSharedFertilizerSchedule,
+  useDeleteSharedPlot,
   useDeleteSharedSpraySchedule,
   useGetMySharedPlots,
   useGetSharedPlotSchedules,
   useInviteCollaborator,
   useRemoveCollaborator,
+  useRenameSharedPlot,
 } from "../hooks/useQueries";
 
 function dateToDate_(d: string): Date_ {
@@ -567,6 +570,13 @@ function SharedPlotCard({
   const { mutateAsync: invite, isPending: inviting } = useInviteCollaborator();
   const { mutateAsync: remove, isPending: removing } = useRemoveCollaborator();
 
+  const [showEdit, setShowEdit] = useState(false);
+  const [editCropName, setEditCropName] = useState(plot.cropName);
+  const [editPlotName, setEditPlotName] = useState(plot.plotName);
+  const { mutateAsync: deletePlot, isPending: deleting } =
+    useDeleteSharedPlot();
+  const { mutateAsync: renamePlot, isPending: renaming } =
+    useRenameSharedPlot();
   const isOwner = plot.owner?.toText?.() === myPrincipal;
 
   const handleInvite = async () => {
@@ -597,6 +607,34 @@ function SharedPlotCard({
       toast.success("Collaborator removed");
     } catch {
       toast.error("Failed to remove collaborator");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Delete this shared plot and all its schedules?")) return;
+    try {
+      await deletePlot({ sharedPlotId: plot.id });
+      toast.success("Shared plot deleted");
+    } catch {
+      toast.error("Failed to delete shared plot");
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!editCropName.trim() || !editPlotName.trim()) {
+      toast.error("Crop name and plot name required");
+      return;
+    }
+    try {
+      await renamePlot({
+        sharedPlotId: plot.id,
+        newCropName: editCropName.trim(),
+        newPlotName: editPlotName.trim(),
+      });
+      setShowEdit(false);
+      toast.success("Shared plot updated!");
+    } catch {
+      toast.error("Failed to update shared plot");
     }
   };
 
@@ -666,9 +704,86 @@ function SharedPlotCard({
               Invite Farmer
             </Button>
           )}
+          {isOwner && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full gap-1.5 border-blue-400/40 text-blue-600"
+                onClick={() => {
+                  setShowEdit((v) => !v);
+                  setEditCropName(plot.cropName);
+                  setEditPlotName(plot.plotName);
+                }}
+                data-ocid="shared_plots.edit_button"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full gap-1.5 border-destructive/40 text-destructive"
+                onClick={handleDelete}
+                disabled={deleting}
+                data-ocid="shared_plots.delete_button"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {deleting ? "Deleting..." : "Delete"}
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Invite form */}
+        {/* Edit form */}
+        <AnimatePresence>
+          {showEdit && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-3 overflow-hidden"
+            >
+              <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3 space-y-3">
+                <p className="text-xs font-semibold text-blue-700">
+                  Edit Shared Plot
+                </p>
+                <div className="space-y-2">
+                  <Input
+                    value={editCropName}
+                    onChange={(e) => setEditCropName(e.target.value)}
+                    placeholder="Crop name"
+                    className="text-xs"
+                  />
+                  <Input
+                    value={editPlotName}
+                    onChange={(e) => setEditPlotName(e.target.value)}
+                    placeholder="Plot name"
+                    className="text-xs"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleEdit}
+                    disabled={renaming}
+                    className="flex-1"
+                  >
+                    {renaming ? "Saving..." : "Save Changes"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowEdit(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence>
           {showInvite && (
             <motion.div
