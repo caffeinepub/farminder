@@ -86,6 +86,16 @@ actor {
     spraySchedules : [SharedSpraySchedule];
   };
 
+  public type SharedOtherWork = {
+    id : Nat;
+    sharedPlotId : Nat;
+    workDescription : Text;
+    scheduledDate : Date;
+    notes : Text;
+    isDone : Bool;
+    addedBy : Principal;
+  };
+
   // Stable storage
   stable var stableNextCropId : Nat = 0;
   stable var stableNextFertilizerScheduleId : Nat = 0;
@@ -103,6 +113,8 @@ actor {
   stable var stableSharedPlots : [(Nat, SharedPlot)] = [];
   stable var stableSharedFertilizerSchedules : [(Nat, [SharedFertilizerSchedule])] = [];
   stable var stableSharedSpraySchedules : [(Nat, [SharedSpraySchedule])] = [];
+  stable var stableNextSharedOtherWorkId : Nat = 0;
+  stable var stableSharedOtherWork : [(Nat, [SharedOtherWork])] = [];
 
   // Runtime counters
   var nextCropId = stableNextCropId;
@@ -112,6 +124,7 @@ actor {
   var nextSharedPlotId = stableNextSharedPlotId;
   var nextSharedFertScheduleId = stableNextSharedFertScheduleId;
   var nextSharedSprayScheduleId = stableNextSharedSprayScheduleId;
+  var nextSharedOtherWorkId = stableNextSharedOtherWorkId;
 
   // In-memory maps (restored from stable storage below)
   let crops = Map.empty<Principal, List.List<Crop>>();
@@ -122,6 +135,7 @@ actor {
   let sharedPlots = Map.empty<Nat, SharedPlot>();
   let sharedFertilizerSchedules = Map.empty<Nat, List.List<SharedFertilizerSchedule>>();
   let sharedSpraySchedules = Map.empty<Nat, List.List<SharedSpraySchedule>>();
+  let sharedOtherWorkMap = Map.empty<Nat, List.List<SharedOtherWork>>();
 
   // Restore data on actor init
   for ((p, arr) in stableCrops.vals()) {
@@ -148,6 +162,9 @@ actor {
   for ((id, arr) in stableSharedSpraySchedules.vals()) {
     sharedSpraySchedules.add(id, List.fromArray<SharedSpraySchedule>(arr));
   };
+  for ((id, arr) in stableSharedOtherWork.vals()) {
+    sharedOtherWorkMap.add(id, List.fromArray<SharedOtherWork>(arr));
+  };
 
   system func preupgrade() {
     stableNextCropId := nextCropId;
@@ -157,6 +174,7 @@ actor {
     stableNextSharedPlotId := nextSharedPlotId;
     stableNextSharedFertScheduleId := nextSharedFertScheduleId;
     stableNextSharedSprayScheduleId := nextSharedSprayScheduleId;
+    stableNextSharedOtherWorkId := nextSharedOtherWorkId;
 
     let cropsBuf = List.empty<(Principal, [Crop])>();
     for ((p, list) in crops.entries()) {
@@ -203,8 +221,20 @@ actor {
     let sharedSprayBuf = List.empty<(Nat, [SharedSpraySchedule])>();
     for ((id, list) in sharedSpraySchedules.entries()) {
       sharedSprayBuf.add((id, list.toArray()));
+  
+    let sharedOtherWorkBuf = List.empty<(Nat, [SharedOtherWork])>();
+    for ((id, list) in sharedOtherWorkMap.entries()) {
+      sharedOtherWorkBuf.add((id, list.toArray()));
     };
+    stableSharedOtherWork := sharedOtherWorkBuf.toArray();
+  };
     stableSharedSpraySchedules := sharedSprayBuf.toArray();
+
+    let sharedOtherWorkBuf = List.empty<(Nat, [SharedOtherWork])>();
+    for ((id, list) in sharedOtherWorkMap.entries()) {
+      sharedOtherWorkBuf.add((id, list.toArray()));
+    };
+    stableSharedOtherWork := sharedOtherWorkBuf.toArray();
   };
 
   system func postupgrade() {
@@ -215,6 +245,7 @@ actor {
     nextSharedPlotId := stableNextSharedPlotId;
     nextSharedFertScheduleId := stableNextSharedFertScheduleId;
     nextSharedSprayScheduleId := stableNextSharedSprayScheduleId;
+    nextSharedOtherWorkId := stableNextSharedOtherWorkId;
   };
 
   func checkAnonymous(caller : Principal) {
@@ -292,6 +323,17 @@ actor {
       case (null) {
         let newList = List.empty<SharedSpraySchedule>();
         sharedSpraySchedules.add(sharedPlotId, newList);
+        newList;
+      };
+    };
+  };
+
+  func getOrCreateSharedOtherWorkList(sharedPlotId : Nat) : List.List<SharedOtherWork> {
+    switch (sharedOtherWorkMap.get(sharedPlotId)) {
+      case (?list) { list };
+      case (null) {
+        let newList = List.empty<SharedOtherWork>();
+        sharedOtherWorkMap.add(sharedPlotId, newList);
         newList;
       };
     };
@@ -874,7 +916,105 @@ actor {
     };
   };
 
-  public query ({ caller }) func getSharedPlotSchedules(sharedPlotId : Nat) : async SharedPlotSchedules {
+  public shared ({ caller }) func addSharedOtherWork(
+    sharedPlotId : Nat, workDescription : Text, scheduledDate : Date, notes : Text,
+  ) : async Nat {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    if (not isCollaborator(plot, caller)) Runtime.trap("Not authorized for this plot");
+    let newWork : SharedOtherWork = {
+      id = nextSharedOtherWorkId;
+      sharedPlotId;
+      workDescription;
+      scheduledDate;
+      notes;
+      isDone = false;
+      addedBy = caller;
+    };
+    let list = getOrCreateSharedOtherWorkList(sharedPlotId);
+    list.add(newWork);
+    nextSharedOtherWorkId += 1;
+    newWork.id;
+  };
+
+  public query ({ caller }) func getSharedOtherWork(sharedPlotId : Nat) : async [SharedOtherWork] {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    if (not isCollaborator(plot, caller)) Runtime.trap("Not authorized for this plot");
+    switch (sharedOtherWorkMap.get(sharedPlotId)) {
+      case (null) { [] };
+      case (?l) { l.toArray() };
+    };
+  };
+
+  public query ({ caller }) func getAllMySharedOtherWork() : async [SharedOtherWork] {
+    checkAnonymous(caller);
+    let result = List.empty<SharedOtherWork>();
+    for ((_, plot) in sharedPlots.entries()) {
+      if (isCollaborator(plot, caller)) {
+        switch (sharedOtherWorkMap.get(plot.id)) {
+          case (null) {};
+          case (?list) {
+            for (w in list.toArray().vals()) {
+              result.add(w);
+            };
+          };
+        };
+      };
+    };
+    result.toArray();
+  };
+
+  public shared ({ caller }) func deleteSharedOtherWork(sharedPlotId : Nat, workId : Nat) : async () {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    switch (sharedOtherWorkMap.get(sharedPlotId)) {
+      case (null) { Runtime.trap("No work found") };
+      case (?list) {
+        let target = list.filter(func(w) { w.id == workId });
+        if (target.size() == 0) Runtime.trap("Work not found");
+        let w = target.toArray()[0];
+        if (plot.owner != caller and w.addedBy != caller) Runtime.trap("Not authorized");
+        let arr = list.filter(func(w2) { w2.id != workId }).toArray();
+        let size = list.size();
+        var i = 0;
+        while (i < size) { ignore list.removeLast(); i += 1 };
+        for (item in arr.vals()) { list.add(item) };
+      };
+    };
+  };
+
+  public shared ({ caller }) func markSharedOtherWorkAsDone(sharedPlotId : Nat, workId : Nat) : async () {
+    checkAnonymous(caller);
+    let plot = switch (sharedPlots.get(sharedPlotId)) {
+      case (null) { Runtime.trap("Shared plot not found") };
+      case (?p) { p };
+    };
+    if (not isCollaborator(plot, caller)) Runtime.trap("Not authorized for this plot");
+    switch (sharedOtherWorkMap.get(sharedPlotId)) {
+      case (null) { Runtime.trap("No work found") };
+      case (?list) {
+        let arr = list.map<SharedOtherWork, SharedOtherWork>(func(w) {
+          if (w.id == workId) { { w with isDone = true } } else { w }
+        }).toArray();
+        let size = list.size();
+        var i = 0;
+        while (i < size) { ignore list.removeLast(); i += 1 };
+        for (item in arr.vals()) { list.add(item) };
+      };
+    };
+  };
+
+    public query ({ caller }) func getSharedPlotSchedules(sharedPlotId : Nat) : async SharedPlotSchedules {
     checkAnonymous(caller);
     let plot = switch (sharedPlots.get(sharedPlotId)) {
       case (null) { Runtime.trap("Shared plot not found") };

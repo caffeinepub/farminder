@@ -17,7 +17,10 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Briefcase,
+  CheckCircle,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -35,6 +38,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Date_, SharedPlot } from "../backend.d";
+import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAddSharedFertilizerSchedule,
@@ -92,6 +96,83 @@ function SharedPlotSchedules({
 
   const [showFertForm, setShowFertForm] = useState(false);
   const [showSprayForm, setShowSprayForm] = useState(false);
+  const [showOtherWorkForm, setShowOtherWorkForm] = useState(false);
+
+  const { actor: rawActor } = useActor();
+  const qc = useQueryClient();
+
+  const [owForm, setOwForm] = useState({
+    description: "",
+    date: (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    })(),
+    notes: "",
+  });
+  const [owSubmitting, setOwSubmitting] = useState(false);
+
+  const { data: sharedOtherWork } = useQuery<any[]>({
+    queryKey: ["sharedOtherWork"],
+    queryFn: async () => {
+      if (!rawActor) return [];
+      try {
+        return await (rawActor as any).getAllMySharedOtherWork();
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!rawActor && showOtherWorkForm,
+  });
+
+  const mySharedWork = (sharedOtherWork ?? []).filter(
+    (e: any) => BigInt(e.sharedPlotId) === BigInt(plot.id),
+  );
+
+  const handleAddSharedOtherWork = async () => {
+    if (!owForm.description.trim()) {
+      toast.error("Description required");
+      return;
+    }
+    if (!owForm.date) {
+      toast.error("Date required");
+      return;
+    }
+    setOwSubmitting(true);
+    try {
+      const [y, m, d] = owForm.date.split("-").map(Number);
+      await (rawActor as any).addSharedOtherWork(
+        plot.id,
+        owForm.description.trim(),
+        { day: BigInt(d), month: BigInt(m), year: BigInt(y) },
+        owForm.notes,
+      );
+      qc.invalidateQueries({ queryKey: ["sharedOtherWork"] });
+      setOwForm((f) => ({ ...f, description: "", notes: "" }));
+      toast.success("Other work added");
+    } catch {
+      toast.error("Failed to add other work");
+    } finally {
+      setOwSubmitting(false);
+    }
+  };
+
+  const handleMarkSharedWorkDone = async (id: bigint) => {
+    try {
+      await (rawActor as any).markSharedOtherWorkAsDone(plot.id, id);
+      qc.invalidateQueries({ queryKey: ["sharedOtherWork"] });
+    } catch {
+      toast.error("Failed to mark done");
+    }
+  };
+
+  const handleDeleteSharedWork = async (id: bigint) => {
+    try {
+      await (rawActor as any).deleteSharedOtherWork(plot.id, id);
+      qc.invalidateQueries({ queryKey: ["sharedOtherWork"] });
+    } catch {
+      toast.error("Failed to delete");
+    }
+  };
 
   const [fertForm, setFertForm] = useState({
     name: "",
@@ -205,6 +286,20 @@ function SharedPlotSchedules({
         >
           <Wind className="w-3.5 h-3.5" />
           Add Spray
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className={`gap-2 rounded-full border-amber-400/60 text-amber-700 ${showOtherWorkForm ? "bg-amber-50" : ""}`}
+          onClick={() => {
+            setShowOtherWorkForm((v) => !v);
+            setShowFertForm(false);
+            setShowSprayForm(false);
+          }}
+          data-ocid="shared_plots.toggle"
+        >
+          <Briefcase className="w-3.5 h-3.5" />
+          Other Work
         </Button>
       </div>
 
@@ -548,14 +643,165 @@ function SharedPlotSchedules({
         </div>
       )}
 
-      {ferts.length === 0 && sprays.length === 0 && (
-        <p
-          className="text-sm text-muted-foreground text-center py-4"
-          data-ocid="shared_plots.empty_state"
-        >
-          No schedules yet. Add your first fertilizer or spray above.
-        </p>
-      )}
+      {/* Add Other Work Inline Form */}
+      <AnimatePresence>
+        {showOtherWorkForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3 overflow-hidden"
+          >
+            <p className="font-semibold text-sm text-amber-800 flex items-center gap-1.5">
+              <Briefcase className="w-4 h-4" />
+              Other Work
+            </p>
+            <div className="space-y-2">
+              <div>
+                <Label className="text-xs">Work Description</Label>
+                <Textarea
+                  value={owForm.description}
+                  onChange={(e) =>
+                    setOwForm((f) => ({ ...f, description: e.target.value }))
+                  }
+                  placeholder="Describe the work..."
+                  rows={2}
+                  className="mt-1 border-amber-200"
+                  data-ocid="shared_plots.textarea"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Date</Label>
+                <Input
+                  type="date"
+                  value={owForm.date}
+                  onChange={(e) =>
+                    setOwForm((f) => ({ ...f, date: e.target.value }))
+                  }
+                  className="mt-1 border-amber-200"
+                  data-ocid="shared_plots.input"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Notes (optional)</Label>
+                <Input
+                  value={owForm.notes}
+                  onChange={(e) =>
+                    setOwForm((f) => ({ ...f, notes: e.target.value }))
+                  }
+                  placeholder="Any notes..."
+                  className="mt-1 border-amber-200"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleAddSharedOtherWork}
+                  disabled={owSubmitting}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  data-ocid="shared_plots.submit_button"
+                >
+                  {owSubmitting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                  ) : null}
+                  Add Work
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowOtherWorkForm(false)}
+                  data-ocid="shared_plots.cancel_button"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+
+            {/* Shared Other Work Entries */}
+            {mySharedWork.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                  Entries
+                </p>
+                {mySharedWork.map((e: any, wi: number) => {
+                  const canDelete =
+                    isOwner || e.addedBy?.toText?.() === myPrincipal;
+                  return (
+                    <div
+                      key={e.id.toString()}
+                      className={`rounded-lg p-3 border border-amber-200 flex items-start justify-between gap-2 ${e.isDone ? "opacity-60" : "bg-white"}`}
+                      data-ocid={`shared_plots.item.${wi + 1}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={`text-sm font-medium ${e.isDone ? "line-through text-muted-foreground" : "text-amber-900"}`}
+                        >
+                          {e.workDescription}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          <Badge
+                            variant="outline"
+                            className="text-xs rounded-full"
+                          >
+                            {e.scheduledDate
+                              ? `${String(Number(e.scheduledDate.day)).padStart(2, "0")}/${String(Number(e.scheduledDate.month)).padStart(2, "0")}/${Number(e.scheduledDate.year)}`
+                              : ""}
+                          </Badge>
+                          <Badge className="text-xs rounded-full bg-purple-100 text-purple-700 border-purple-200">
+                            Shared
+                          </Badge>
+                        </div>
+                        {e.notes && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {e.notes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {!e.isDone && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="w-7 h-7 text-amber-600 hover:text-amber-800 hover:bg-amber-100"
+                            onClick={() => handleMarkSharedWorkDone(e.id)}
+                            title="Mark done"
+                            data-ocid={`shared_plots.toggle.${wi + 1}`}
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="w-7 h-7 text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteSharedWork(e.id)}
+                            data-ocid={`shared_plots.delete_button.${wi + 1}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {ferts.length === 0 &&
+        sprays.length === 0 &&
+        mySharedWork.length === 0 &&
+        !showOtherWorkForm && (
+          <p
+            className="text-sm text-muted-foreground text-center py-4"
+            data-ocid="shared_plots.empty_state"
+          >
+            No schedules yet. Add your first fertilizer or spray above.
+          </p>
+        )}
     </div>
   );
 }
@@ -588,7 +834,7 @@ function SharedPlotCard({
       // We pass the principal string; backend accepts Principal type
       await invite({
         sharedPlotId: plot.id,
-        collaboratorId: invitePrincipal.trim(),
+        collaborator: invitePrincipal.trim(),
       });
       setInvitePrincipal("");
       setShowInvite(false);
@@ -602,7 +848,7 @@ function SharedPlotCard({
     try {
       await remove({
         sharedPlotId: plot.id,
-        collaboratorId: collaborator.toText(),
+        collaborator: collaborator.toText(),
       });
       toast.success("Collaborator removed");
     } catch {
@@ -613,7 +859,7 @@ function SharedPlotCard({
   const handleDelete = async () => {
     if (!confirm("Delete this shared plot and all its schedules?")) return;
     try {
-      await deletePlot({ sharedPlotId: plot.id });
+      await deletePlot(plot.id);
       toast.success("Shared plot deleted");
     } catch {
       toast.error("Failed to delete shared plot");

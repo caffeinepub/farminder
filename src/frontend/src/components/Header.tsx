@@ -1,14 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
-import {
-  Briefcase,
-  CalendarDays,
-  Layers,
-  Menu,
-  Package,
-  X,
-} from "lucide-react";
+import { CalendarDays, Layers, Menu, Package, X } from "lucide-react";
 import { useState } from "react";
 import farmLogo from "/assets/uploads/Screenshot_2026-03-19-17-53-17-36_40deb401b9ffe8e1df2f1cc5ba480b12-1.jpg";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -19,7 +12,6 @@ const NAV_LINKS = [
   { label: "Plots", to: "/plots", icon: Layers },
   { label: "Calendar", to: "/calendar", icon: CalendarDays },
   { label: "Materials", to: "/materials", icon: Package },
-  { label: "Other Work", to: "/other-work", icon: Briefcase },
 ];
 
 export default function Header() {

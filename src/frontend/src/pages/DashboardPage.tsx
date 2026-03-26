@@ -11,6 +11,7 @@ import {
   Droplets,
   Leaf,
   Loader2,
+  Share2,
   Sprout,
   Users,
 } from "lucide-react";
@@ -27,7 +28,7 @@ import {
   useMarkFertilizerScheduleAsDone,
   useMarkSprayScheduleAsDone,
 } from "../hooks/useQueries";
-import type { OtherWork } from "./OtherWorkPage";
+import type { OtherWork, SharedOtherWork, SharedPlot } from "./OtherWorkPage";
 
 function extractQty(notes: string): string | null {
   const line = notes.split("\n").find((l) => l.startsWith("Qty:"));
@@ -79,6 +80,38 @@ export default function DashboardPage() {
     },
     enabled: !!actor,
   });
+
+  const { data: allSharedPlots = [] } = useQuery<SharedPlot[]>({
+    queryKey: ["mySharedPlots"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as any).getMySharedPlots() as Promise<SharedPlot[]>;
+    },
+    enabled: !!actor,
+  });
+
+  const { data: allSharedOtherWork = [] } = useQuery<SharedOtherWork[]>({
+    queryKey: ["sharedOtherWork"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as any).getAllMySharedOtherWork() as Promise<
+        SharedOtherWork[]
+      >;
+    },
+    enabled: !!actor,
+  });
+
+  const todaySharedWork = allSharedOtherWork.filter((entry) => {
+    return (
+      Number(entry.scheduledDate.day) === today.getDate() &&
+      Number(entry.scheduledDate.month) === today.getMonth() + 1 &&
+      Number(entry.scheduledDate.year) === today.getFullYear()
+    );
+  });
+
+  const sharedPlotMap = new Map<string, SharedPlot>(
+    allSharedPlots.map((p) => [p.id.toString(), p]),
+  );
 
   const cropMap = new Map((crops ?? []).map((c) => [c.id.toString(), c]));
 
@@ -644,6 +677,74 @@ export default function DashboardPage() {
                   </Badge>
                 </motion.div>
               ))}
+            </div>
+          </>
+        )}
+        {/* Today's Shared Other Work */}
+        {todaySharedWork.length > 0 && (
+          <>
+            <h2 className="font-display font-bold text-xl mt-8 mb-4 flex items-center gap-2">
+              <Share2 className="w-5 h-5 text-purple-600" />
+              Today's Shared Other Work
+            </h2>
+            <div className="space-y-3">
+              {todaySharedWork.map((entry, i) => {
+                const plot = sharedPlotMap.get(entry.sharedPlotId.toString());
+                return (
+                  <motion.div
+                    key={entry.id.toString()}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    data-ocid={`dashboard.shared_other_work.item.${i + 1}`}
+                    className={`flex items-center gap-4 rounded-xl border shadow-xs p-4 ${entry.isDone ? "bg-muted/40 border-border opacity-60" : "bg-purple-50 border-purple-200"}`}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                      {entry.isDone ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <Share2 className="w-5 h-5 text-purple-600" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={`font-semibold truncate ${entry.isDone ? "line-through text-muted-foreground" : ""}`}
+                      >
+                        {entry.workDescription}
+                      </p>
+                      {plot && (
+                        <p className="text-sm text-muted-foreground truncate">
+                          {plot.cropName} — {plot.plotName}
+                        </p>
+                      )}
+                      {entry.notes && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {entry.notes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <Badge className="text-xs bg-purple-600 text-white hover:bg-purple-700">
+                        Shared
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-purple-300 text-purple-600"
+                      >
+                        {`${entry.scheduledDate.day}/${entry.scheduledDate.month}`}
+                      </Badge>
+                      {entry.isDone && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs border-green-300 text-green-600"
+                        >
+                          Done
+                        </Badge>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           </>
         )}

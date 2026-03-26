@@ -71,6 +71,15 @@ export interface SharedPlotSchedules {
     fertilizerSchedules: Array<SharedFertilizerSchedule>;
     spraySchedules: Array<SharedSpraySchedule>;
 }
+export interface SharedOtherWork {
+    id: bigint;
+    sharedPlotId: bigint;
+    workDescription: string;
+    scheduledDate: Date_;
+    notes: string;
+    isDone: boolean;
+    addedBy: Principal;
+}
 export interface backendInterface {
     addCrop(name: string, cropType: string, plotName: string): Promise<bigint>;
     listCrops(): Promise<Array<Crop>>;
@@ -105,4 +114,13 @@ export interface backendInterface {
     getSharedPlotSchedules(sharedPlotId: bigint): Promise<SharedPlotSchedules>;
     deleteSharedPlot(sharedPlotId: bigint): Promise<void>;
     renameSharedPlot(sharedPlotId: bigint, newCropName: string, newPlotName: string): Promise<void>;
+    addOtherWork(plotName: string, workDescription: string, scheduledDate: Date_, notes: string): Promise<void>;
+    getAllOtherWork(): Promise<Array<any>>;
+    deleteOtherWork(workId: bigint): Promise<void>;
+    markOtherWorkAsDone(workId: bigint): Promise<void>;
+    addSharedOtherWork(sharedPlotId: bigint, workDescription: string, scheduledDate: Date_, notes: string): Promise<bigint>;
+    getSharedOtherWork(sharedPlotId: bigint): Promise<Array<SharedOtherWork>>;
+    getAllMySharedOtherWork(): Promise<Array<SharedOtherWork>>;
+    deleteSharedOtherWork(sharedPlotId: bigint, workId: bigint): Promise<void>;
+    markSharedOtherWorkAsDone(sharedPlotId: bigint, workId: bigint): Promise<void>;
 }

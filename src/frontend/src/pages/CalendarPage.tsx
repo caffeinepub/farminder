@@ -325,7 +325,7 @@ export default function CalendarPage() {
   const sharedFerts: ScheduleItem[] = [];
   const sharedSprays: ScheduleItem[] = [];
   for (let i = 0; i < sharedSchedulesQueries.length; i++) {
-    const result = sharedSchedulesQueries[i].data;
+    const result = sharedSchedulesQueries[i].data as any;
     const plot = sharedPlots?.[i];
     if (!result || !plot) continue;
     const plotLabel = `${plot.cropName} - ${plot.plotName}`;

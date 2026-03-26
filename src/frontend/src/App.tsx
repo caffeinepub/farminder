@@ -19,7 +19,6 @@ import CalendarPage from "./pages/CalendarPage";
 import CropsPage from "./pages/CropsPage";
 import DashboardPage from "./pages/DashboardPage";
 import MaterialsPage from "./pages/MaterialsPage";
-import OtherWorkPage from "./pages/OtherWorkPage";
 import PlotsPage from "./pages/PlotsPage";
 import SchedulePage from "./pages/SchedulePage";
 import SharePlotPage from "./pages/SharePlotPage";
@@ -281,16 +280,6 @@ const materialsRoute = createRoute({
   ),
 });
 
-const otherWorkRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/other-work",
-  component: () => (
-    <AuthGuard>
-      <OtherWorkPage />
-    </AuthGuard>
-  ),
-});
-
 const shareRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/share",
@@ -306,7 +295,6 @@ const routeTree = rootRoute.addChildren([
   sprayScheduleRoute,
   calendarRoute,
   materialsRoute,
-  otherWorkRoute,
   shareRoute,
 ]);
 

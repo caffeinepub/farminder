@@ -28,7 +28,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Briefcase,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
   FlaskConical,
@@ -43,7 +46,7 @@ import {
   Wind,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   Crop,
@@ -51,6 +54,7 @@ import type {
   FertilizerSchedule,
   SpraySchedule,
 } from "../backend.d";
+import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAddCrop,
@@ -1724,6 +1728,88 @@ function PlotCard({
   onEdit: (crop: Crop) => void;
   onShare: (crop: Crop) => void;
 }) {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  const [showOtherWork, setShowOtherWork] = useState(false);
+  const [owForm, setOwForm] = useState({
+    description: "",
+    date: (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    })(),
+    notes: "",
+  });
+  const [owSubmitting, setOwSubmitting] = useState(false);
+
+  const plotLabel = crop.plotName?.trim() || crop.name;
+
+  const { data: allOtherWork } = useQuery<any[]>({
+    queryKey: ["otherWork"],
+    queryFn: async () => {
+      if (!actor) return [];
+      try {
+        return await (actor as any).getAllOtherWork();
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!actor && showOtherWork,
+  });
+
+  const myWork = (allOtherWork ?? []).filter(
+    (e: any) => e.plotName === plotLabel,
+  );
+
+  const handleAddOtherWork = async () => {
+    if (!owForm.description.trim()) {
+      toast.error("Description required");
+      return;
+    }
+    if (!owForm.date) {
+      toast.error("Date required");
+      return;
+    }
+    setOwSubmitting(true);
+    try {
+      const [y, m, d] = owForm.date.split("-").map(Number);
+      await (actor as any).addOtherWork(
+        plotLabel,
+        owForm.description.trim(),
+        { day: BigInt(d), month: BigInt(m), year: BigInt(y) },
+        owForm.notes,
+      );
+      qc.invalidateQueries({ queryKey: ["otherWork"] });
+      setOwForm((f) => ({ ...f, description: "", notes: "" }));
+      toast.success("Other work added");
+    } catch {
+      toast.error("Failed to add other work");
+    } finally {
+      setOwSubmitting(false);
+    }
+  };
+
+  const handleMarkDone = async (id: bigint) => {
+    try {
+      await (actor as any).markOtherWorkAsDone(id);
+      qc.invalidateQueries({ queryKey: ["otherWork"] });
+    } catch {
+      toast.error("Failed to mark done");
+    }
+  };
+
+  const handleDeleteWork = async (id: bigint) => {
+    try {
+      await (actor as any).deleteOtherWork(id);
+      qc.invalidateQueries({ queryKey: ["otherWork"] });
+    } catch {
+      toast.error("Failed to delete");
+    }
+  };
+
+  function fmtDate(d: { day: bigint; month: bigint; year: bigint }) {
+    return `${String(Number(d.day)).padStart(2, "0")}/${String(Number(d.month)).padStart(2, "0")}/${Number(d.year)}`;
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -1820,6 +1906,16 @@ function PlotCard({
         <Button
           size="sm"
           variant="outline"
+          data-ocid={`plots.secondary_button.${index + 1}`}
+          onClick={() => setShowOtherWork((v) => !v)}
+          className={`flex-1 text-xs border-amber-300 text-amber-700 hover:bg-amber-50 ${showOtherWork ? "bg-amber-50" : ""}`}
+        >
+          <Briefcase className="w-3.5 h-3.5 mr-1" />
+          Other Work
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
           data-ocid={`plots.view_button.${index + 1}`}
           onClick={() => onViewSchedules(crop)}
           className="w-full text-xs mt-0.5"
@@ -1828,6 +1924,137 @@ function PlotCard({
           View Schedules
         </Button>
       </div>
+
+      {/* Inline Other Work Section */}
+      <AnimatePresence>
+        {showOtherWork && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+              <p className="font-semibold text-sm text-amber-800 flex items-center gap-1.5">
+                <Briefcase className="w-4 h-4" />
+                Other Work
+              </p>
+
+              {/* Add form */}
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-xs text-amber-700">
+                    Work Description
+                  </Label>
+                  <Textarea
+                    value={owForm.description}
+                    onChange={(e) =>
+                      setOwForm((f) => ({ ...f, description: e.target.value }))
+                    }
+                    placeholder="Describe the work..."
+                    rows={2}
+                    className="mt-1 border-amber-200 focus:border-amber-400"
+                    data-ocid={`plots.textarea.${index + 1}`}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-amber-700">Date</Label>
+                  <Input
+                    type="date"
+                    value={owForm.date}
+                    onChange={(e) =>
+                      setOwForm((f) => ({ ...f, date: e.target.value }))
+                    }
+                    className="mt-1 border-amber-200"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-amber-700">
+                    Notes (optional)
+                  </Label>
+                  <Input
+                    value={owForm.notes}
+                    onChange={(e) =>
+                      setOwForm((f) => ({ ...f, notes: e.target.value }))
+                    }
+                    placeholder="Any notes..."
+                    className="mt-1 border-amber-200"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleAddOtherWork}
+                    disabled={owSubmitting}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                    data-ocid={`plots.submit_button.${index + 1}`}
+                  >
+                    {owSubmitting ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                    ) : null}
+                    Add Work
+                  </Button>
+                </div>
+              </div>
+
+              {/* Work entries */}
+              {myWork.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                    Entries
+                  </p>
+                  {myWork.map((e: any, wi: number) => (
+                    <div
+                      key={e.id.toString()}
+                      className={`rounded-lg p-3 border border-amber-200 flex items-start justify-between gap-2 ${e.isDone ? "opacity-60" : "bg-white"}`}
+                      data-ocid={`plots.item.${wi + 1}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={`text-sm font-medium ${e.isDone ? "line-through text-muted-foreground" : "text-amber-900"}`}
+                        >
+                          {e.workDescription}
+                        </p>
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          {fmtDate(e.scheduledDate)}
+                        </p>
+                        {e.notes && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {e.notes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {!e.isDone && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="w-7 h-7 text-amber-600 hover:text-amber-800 hover:bg-amber-100"
+                            onClick={() => handleMarkDone(e.id)}
+                            title="Mark done"
+                            data-ocid={`plots.toggle.${wi + 1}`}
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="w-7 h-7 text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteWork(e.id)}
+                          data-ocid={`plots.delete_button.${wi + 1}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -142,7 +142,7 @@ export default function MaterialsPage() {
   if (sharedPlots) {
     sharedPlots.forEach((plot, idx) => {
       const queryResult = sharedSchedulesQueries[idx];
-      const schedules = queryResult?.data;
+      const schedules = queryResult?.data as any;
       if (!schedules) return;
 
       for (const f of schedules.fertilizerSchedules) {
