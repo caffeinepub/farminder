@@ -29,6 +29,14 @@ export interface SpraySchedule {
   'notes' : string,
   'sprayName' : string,
 }
+export interface OtherWork {
+  'id' : bigint,
+  'plotName' : string,
+  'workDescription' : string,
+  'scheduledDate' : Date,
+  'notes' : string,
+  'isDone' : boolean,
+}
 export interface UserProfile { 'name' : string }
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
@@ -72,6 +80,11 @@ export interface _SERVICE {
   'addCrop' : ActorMethod<[string, string, string], bigint>,
   'addFertilizerSchedule' : ActorMethod<[bigint, string, Date, string], bigint>,
   'addSpraySchedule' : ActorMethod<[bigint, string, Date, string], bigint>,
+  'addOtherWork' : ActorMethod<[string, string, Date, string], bigint>,
+  'getAllOtherWork' : ActorMethod<[], Array<OtherWork>>,
+  'getTodaysOtherWork' : ActorMethod<[Date], Array<OtherWork>>,
+  'deleteOtherWork' : ActorMethod<[bigint], undefined>,
+  'markOtherWorkAsDone' : ActorMethod<[bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'deleteCrop' : ActorMethod<[bigint], undefined>,
   'deleteFertilizerSchedule' : ActorMethod<[bigint], undefined>,

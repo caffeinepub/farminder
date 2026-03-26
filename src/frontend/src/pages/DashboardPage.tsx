@@ -2,26 +2,32 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
   BellOff,
+  Briefcase,
   CheckCircle,
   Droplets,
   Leaf,
   Loader2,
   Sprout,
+  Users,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { useActor } from "../hooks/useActor";
 import { useNotifications } from "../hooks/useNotifications";
 import {
   useGetTodaysFertilizerSchedules,
+  useGetTodaysSharedSchedules,
   useGetTodaysSpraySchedules,
   useListCrops,
   useMarkFertilizerScheduleAsDone,
   useMarkSprayScheduleAsDone,
 } from "../hooks/useQueries";
+import type { OtherWork } from "./OtherWorkPage";
 
 function extractQty(notes: string): string | null {
   const line = notes.split("\n").find((l) => l.startsWith("Qty:"));
@@ -42,6 +48,12 @@ export default function DashboardPage() {
     useGetTodaysFertilizerSchedules();
   const { data: todaySpray, isLoading: sprayLoading } =
     useGetTodaysSpraySchedules();
+  const {
+    sharedFertToday,
+    sharedSprayToday,
+    isLoading: sharedLoading,
+    hasSharedPlots,
+  } = useGetTodaysSharedSchedules();
   const { mutateAsync: markFertDone, isPending: fertPending } =
     useMarkFertilizerScheduleAsDone();
   const { mutateAsync: markSprayDone, isPending: sprayPending } =
@@ -53,6 +65,21 @@ export default function DashboardPage() {
     scheduleDailyNotification,
   } = useNotifications();
 
+  const { actor } = useActor();
+  const today = new Date();
+  const { data: todayOtherWork = [] } = useQuery<OtherWork[]>({
+    queryKey: ["otherWorkToday"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return (actor as any).getTodaysOtherWork({
+        day: BigInt(today.getDate()),
+        month: BigInt(today.getMonth() + 1),
+        year: BigInt(today.getFullYear()),
+      }) as Promise<OtherWork[]>;
+    },
+    enabled: !!actor,
+  });
+
   const cropMap = new Map((crops ?? []).map((c) => [c.id.toString(), c]));
 
   const fertPending_ = (todayFertilizer ?? []).filter((s) => !s.isDone);
@@ -60,29 +87,39 @@ export default function DashboardPage() {
   const sprayPending_ = (todaySpray ?? []).filter((s) => !s.isDone);
   const sprayDone = (todaySpray ?? []).filter((s) => s.isDone);
 
-  const totalTasks = (todayFertilizer?.length ?? 0) + (todaySpray?.length ?? 0);
+  const totalTasks =
+    (todayFertilizer?.length ?? 0) +
+    (todaySpray?.length ?? 0) +
+    sharedFertToday.length +
+    sharedSprayToday.length;
   const totalDone = fertDone.length + sprayDone.length;
 
-  const schedulesLoading = fertilizerLoading || sprayLoading;
+  const schedulesLoading = fertilizerLoading || sprayLoading || sharedLoading;
 
   const notificationScheduledRef = useRef(false);
 
   useEffect(() => {
+    const allFertPending = fertPending_.length + sharedFertToday.length;
+    const allSprayPending = sprayPending_.length + sharedSprayToday.length;
     if (
       !fertilizerLoading &&
       !sprayLoading &&
+      !sharedLoading &&
       permission === "granted" &&
       !notificationScheduledRef.current &&
-      (fertPending_.length > 0 || sprayPending_.length > 0)
+      (allFertPending > 0 || allSprayPending > 0)
     ) {
       notificationScheduledRef.current = true;
-      scheduleDailyNotification(fertPending_.length, sprayPending_.length);
+      scheduleDailyNotification(allFertPending, allSprayPending);
     }
   }, [
     fertilizerLoading,
     sprayLoading,
+    sharedLoading,
     fertPending_.length,
     sprayPending_.length,
+    sharedFertToday.length,
+    sharedSprayToday.length,
     permission,
     scheduleDailyNotification,
   ]);
@@ -341,6 +378,61 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Today's Shared Fertilizer Tasks */}
+        {hasSharedPlots && sharedFertToday.length > 0 && (
+          <>
+            <h2 className="font-display font-bold text-xl mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-purple-600" />
+              Today&apos;s Shared Fertilizer Tasks
+            </h2>
+            <div className="space-y-3 mb-8">
+              {sharedFertToday.map(({ schedule: s, plot }, i) => (
+                <motion.div
+                  key={`${s.sharedPlotId}-${s.id}`}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  data-ocid={`dashboard.shared.item.${i + 1}`}
+                  className="flex items-center gap-4 bg-purple-50 rounded-xl border border-purple-200 shadow-xs p-4"
+                >
+                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                    <Leaf className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold truncate">
+                        {plot.cropName} — {plot.plotName}
+                      </p>
+                      <Badge className="bg-purple-600 text-white text-xs shrink-0 hover:bg-purple-700">
+                        Shared
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate flex items-center flex-wrap gap-1">
+                      {s.fertilizerName}
+                      {s.quantity && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                          {s.quantity}
+                        </span>
+                      )}
+                    </p>
+                    {s.notes && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {s.notes}
+                      </p>
+                    )}
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 text-xs border-purple-300 text-purple-600"
+                  >
+                    {`${s.scheduledDate.day}/${s.scheduledDate.month}`}
+                  </Badge>
+                </motion.div>
+              ))}
+            </div>
+          </>
+        )}
+
         {/* Today's Spray Tasks */}
         <h2 className="font-display font-bold text-xl mb-4">
           Today&apos;s Spray Tasks
@@ -451,6 +543,109 @@ export default function DashboardPage() {
               );
             })}
           </div>
+        )}
+
+        {/* Today's Shared Spray Tasks */}
+        {hasSharedPlots && sharedSprayToday.length > 0 && (
+          <>
+            <h2 className="font-display font-bold text-xl mt-8 mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-purple-600" />
+              Today&apos;s Shared Spray Tasks
+            </h2>
+            <div className="space-y-3">
+              {sharedSprayToday.map(({ schedule: s, plot }, i) => (
+                <motion.div
+                  key={`${s.sharedPlotId}-${s.id}`}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  data-ocid={`dashboard.shared.spray.item.${i + 1}`}
+                  className="flex items-center gap-4 bg-purple-50 rounded-xl border border-purple-200 shadow-xs p-4"
+                >
+                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                    <Droplets className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold truncate">
+                        {plot.cropName} — {plot.plotName}
+                      </p>
+                      <Badge className="bg-purple-600 text-white text-xs shrink-0 hover:bg-purple-700">
+                        Shared
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate flex items-center flex-wrap gap-1">
+                      {s.sprayName}
+                      {s.quantity && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                          {s.quantity}
+                        </span>
+                      )}
+                    </p>
+                    {s.notes && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {s.notes}
+                      </p>
+                    )}
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 text-xs border-purple-300 text-purple-600"
+                  >
+                    {`${s.scheduledDate.day}/${s.scheduledDate.month}`}
+                  </Badge>
+                </motion.div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Other Work Today */}
+        {todayOtherWork.length > 0 && (
+          <>
+            <h2 className="font-display font-bold text-xl mt-8 mb-4 flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-amber-600" />
+              Other Work Today
+            </h2>
+            <div className="space-y-3">
+              {todayOtherWork.map((entry, i) => (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  data-ocid={`dashboard.other_work.item.${i + 1}`}
+                  className={`flex items-center gap-4 rounded-xl border shadow-xs p-4 ${entry.isDone ? "bg-muted/40 border-border opacity-60" : "bg-amber-50 border-amber-200"}`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                    {entry.isDone ? (
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <Briefcase className="w-5 h-5 text-amber-600" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`font-semibold truncate ${entry.isDone ? "line-through text-muted-foreground" : ""}`}
+                    >
+                      {entry.workDescription}
+                    </p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {entry.plotName}
+                    </p>
+                    {entry.notes && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {entry.notes}
+                      </p>
+                    )}
+                  </div>
+                  <Badge className="shrink-0 text-xs bg-amber-500 text-white hover:bg-amber-600">
+                    Other Work
+                  </Badge>
+                </motion.div>
+              ))}
+            </div>
+          </>
         )}
       </motion.div>
     </main>

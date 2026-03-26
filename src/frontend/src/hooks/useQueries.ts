@@ -3,8 +3,10 @@ import type {
   Crop,
   Date_,
   FertilizerSchedule,
+  SharedFertilizerSchedule,
   SharedPlot,
   SharedPlotSchedules,
+  SharedSpraySchedule,
   SpraySchedule,
   UserProfile,
 } from "../backend.d";
@@ -448,6 +450,84 @@ export function useGetSharedPlotSchedules(sharedPlotId: bigint) {
     },
     enabled: !!actor && !isFetching,
   });
+}
+
+export function useGetTodaysSharedSchedules() {
+  const { actor, isFetching } = useActor();
+  const { data: sharedPlots, isLoading: plotsLoading } = useGetMySharedPlots();
+
+  const today = new Date();
+  const todayDay = today.getDate();
+  const todayMonth = today.getMonth() + 1;
+  const todayYear = today.getFullYear();
+
+  const plotIds = (sharedPlots ?? []).map((p) => p.id.toString()).join(",");
+
+  const query = useQuery<{
+    sharedFertToday: Array<{
+      schedule: SharedFertilizerSchedule;
+      plot: SharedPlot;
+    }>;
+    sharedSprayToday: Array<{
+      schedule: SharedSpraySchedule;
+      plot: SharedPlot;
+    }>;
+  }>({
+    queryKey: ["sharedSchedules", "today", plotIds],
+    queryFn: async () => {
+      if (!actor || !sharedPlots || sharedPlots.length === 0) {
+        return { sharedFertToday: [], sharedSprayToday: [] };
+      }
+      const results = await Promise.all(
+        sharedPlots.map(async (plot) => {
+          const schedules = (await (actor as any).getSharedPlotSchedules(
+            plot.id,
+          )) as SharedPlotSchedules;
+          return { plot, schedules };
+        }),
+      );
+
+      const sharedFertToday: Array<{
+        schedule: SharedFertilizerSchedule;
+        plot: SharedPlot;
+      }> = [];
+      const sharedSprayToday: Array<{
+        schedule: SharedSpraySchedule;
+        plot: SharedPlot;
+      }> = [];
+
+      for (const { plot, schedules } of results) {
+        for (const s of schedules.fertilizerSchedules) {
+          if (
+            Number(s.scheduledDate.day) === todayDay &&
+            Number(s.scheduledDate.month) === todayMonth &&
+            Number(s.scheduledDate.year) === todayYear
+          ) {
+            sharedFertToday.push({ schedule: s, plot });
+          }
+        }
+        for (const s of schedules.spraySchedules) {
+          if (
+            Number(s.scheduledDate.day) === todayDay &&
+            Number(s.scheduledDate.month) === todayMonth &&
+            Number(s.scheduledDate.year) === todayYear
+          ) {
+            sharedSprayToday.push({ schedule: s, plot });
+          }
+        }
+      }
+
+      return { sharedFertToday, sharedSprayToday };
+    },
+    enabled: !!actor && !isFetching && !plotsLoading && !!sharedPlots,
+  });
+
+  return {
+    sharedFertToday: query.data?.sharedFertToday ?? [],
+    sharedSprayToday: query.data?.sharedSprayToday ?? [],
+    isLoading: plotsLoading || query.isLoading,
+    hasSharedPlots: (sharedPlots?.length ?? 0) > 0,
+  };
 }
 
 export function useAddSharedFertilizerSchedule() {

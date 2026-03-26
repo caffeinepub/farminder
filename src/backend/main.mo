@@ -40,6 +40,15 @@ actor {
     isDone : Bool;
   };
 
+  public type OtherWork = {
+    id : Nat;
+    plotName : Text;
+    workDescription : Text;
+    scheduledDate : Date;
+    notes : Text;
+    isDone : Bool;
+  };
+
   public type UserProfile = {
     name : Text;
   };
@@ -81,9 +90,11 @@ actor {
   stable var stableNextCropId : Nat = 0;
   stable var stableNextFertilizerScheduleId : Nat = 0;
   stable var stableNextSprayScheduleId : Nat = 0;
+  stable var stableNextOtherWorkId : Nat = 0;
   stable var stableCrops : [(Principal, [Crop])] = [];
   stable var stableFertilizerSchedules : [(Principal, [FertilizerSchedule])] = [];
   stable var stableSpraySchedules : [(Principal, [SpraySchedule])] = [];
+  stable var stableOtherWork : [(Principal, [OtherWork])] = [];
   stable var stableUserProfiles : [(Principal, UserProfile)] = [];
 
   stable var stableNextSharedPlotId : Nat = 0;
@@ -97,6 +108,7 @@ actor {
   var nextCropId = stableNextCropId;
   var nextFertilizerScheduleId = stableNextFertilizerScheduleId;
   var nextSprayScheduleId = stableNextSprayScheduleId;
+  var nextOtherWorkId = stableNextOtherWorkId;
   var nextSharedPlotId = stableNextSharedPlotId;
   var nextSharedFertScheduleId = stableNextSharedFertScheduleId;
   var nextSharedSprayScheduleId = stableNextSharedSprayScheduleId;
@@ -105,12 +117,13 @@ actor {
   let crops = Map.empty<Principal, List.List<Crop>>();
   let fertilizerSchedules = Map.empty<Principal, List.List<FertilizerSchedule>>();
   let spraySchedules = Map.empty<Principal, List.List<SpraySchedule>>();
+  let otherWorkMap = Map.empty<Principal, List.List<OtherWork>>();
   let userProfiles = Map.empty<Principal, UserProfile>();
   let sharedPlots = Map.empty<Nat, SharedPlot>();
   let sharedFertilizerSchedules = Map.empty<Nat, List.List<SharedFertilizerSchedule>>();
   let sharedSpraySchedules = Map.empty<Nat, List.List<SharedSpraySchedule>>();
 
-  // Restore data on actor init (first install: stable arrays are empty; upgrade: they have data)
+  // Restore data on actor init
   for ((p, arr) in stableCrops.vals()) {
     crops.add(p, List.fromArray<Crop>(arr));
   };
@@ -119,6 +132,9 @@ actor {
   };
   for ((p, arr) in stableSpraySchedules.vals()) {
     spraySchedules.add(p, List.fromArray<SpraySchedule>(arr));
+  };
+  for ((p, arr) in stableOtherWork.vals()) {
+    otherWorkMap.add(p, List.fromArray<OtherWork>(arr));
   };
   for ((p, profile) in stableUserProfiles.vals()) {
     userProfiles.add(p, profile);
@@ -137,6 +153,7 @@ actor {
     stableNextCropId := nextCropId;
     stableNextFertilizerScheduleId := nextFertilizerScheduleId;
     stableNextSprayScheduleId := nextSprayScheduleId;
+    stableNextOtherWorkId := nextOtherWorkId;
     stableNextSharedPlotId := nextSharedPlotId;
     stableNextSharedFertScheduleId := nextSharedFertScheduleId;
     stableNextSharedSprayScheduleId := nextSharedSprayScheduleId;
@@ -158,6 +175,12 @@ actor {
       sprayBuf.add((p, list.toArray()));
     };
     stableSpraySchedules := sprayBuf.toArray();
+
+    let otherWorkBuf = List.empty<(Principal, [OtherWork])>();
+    for ((p, list) in otherWorkMap.entries()) {
+      otherWorkBuf.add((p, list.toArray()));
+    };
+    stableOtherWork := otherWorkBuf.toArray();
 
     let profileBuf = List.empty<(Principal, UserProfile)>();
     for ((p, profile) in userProfiles.entries()) {
@@ -184,11 +207,11 @@ actor {
     stableSharedSpraySchedules := sharedSprayBuf.toArray();
   };
 
-  // postupgrade only restores counters (map data already restored in actor body above)
   system func postupgrade() {
     nextCropId := stableNextCropId;
     nextFertilizerScheduleId := stableNextFertilizerScheduleId;
     nextSprayScheduleId := stableNextSprayScheduleId;
+    nextOtherWorkId := stableNextOtherWorkId;
     nextSharedPlotId := stableNextSharedPlotId;
     nextSharedFertScheduleId := stableNextSharedFertScheduleId;
     nextSharedSprayScheduleId := stableNextSharedSprayScheduleId;
@@ -208,7 +231,6 @@ actor {
     false;
   };
 
-  // Helper: get or create a mutable list stored under a Principal key
   func getOrCreateCropList(caller : Principal) : List.List<Crop> {
     switch (crops.get(caller)) {
       case (?list) { list };
@@ -237,6 +259,17 @@ actor {
       case (null) {
         let newList = List.empty<SpraySchedule>();
         spraySchedules.add(caller, newList);
+        newList;
+      };
+    };
+  };
+
+  func getOrCreateOtherWorkList(caller : Principal) : List.List<OtherWork> {
+    switch (otherWorkMap.get(caller)) {
+      case (?list) { list };
+      case (null) {
+        let newList = List.empty<OtherWork>();
+        otherWorkMap.add(caller, newList);
         newList;
       };
     };
@@ -277,7 +310,7 @@ actor {
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
     checkAnonymous(caller);
     switch (userProfiles.get(caller)) {
-      case (?_) { /* already exists, mutable update not needed for records */ };
+      case (?_) { };
       case (null) { userProfiles.add(caller, profile) };
     };
   };
@@ -310,18 +343,12 @@ actor {
       case (null) { Runtime.trap("No crops found for user") };
       case (?l) { l };
     };
-    // Rebuild: filter out old, add updated
     let updated = list.filter(func(c) { c.id != cropId });
     updated.add({ id = cropId; name; cropType; plotName });
-    // Replace list contents in-place by clearing and re-adding
     switch (crops.get(caller)) {
       case (null) { crops.add(caller, updated) };
       case (?existing) {
-        // Clear existing and copy updated items
         let arr = updated.toArray();
-        // We need to mutate in place; create fresh list and swap entries
-        // Since mo:core List is a mutable object stored by reference in the map,
-        // we must clear and refill the same list object to avoid Map.add on existing key.
         let size = existing.size();
         var i = 0;
         while (i < size) {
@@ -553,6 +580,82 @@ actor {
     };
   };
 
+  // ---- Other Work ----
+
+  public shared ({ caller }) func addOtherWork(
+    plotName : Text, workDescription : Text, scheduledDate : Date, notes : Text,
+  ) : async Nat {
+    checkAnonymous(caller);
+    let newWork : OtherWork = {
+      id = nextOtherWorkId;
+      plotName;
+      workDescription;
+      scheduledDate;
+      notes;
+      isDone = false;
+    };
+    let list = getOrCreateOtherWorkList(caller);
+    list.add(newWork);
+    nextOtherWorkId += 1;
+    newWork.id;
+  };
+
+  public query ({ caller }) func getAllOtherWork() : async [OtherWork] {
+    checkAnonymous(caller);
+    switch (otherWorkMap.get(caller)) {
+      case (null) { [] };
+      case (?list) { list.toArray() };
+    };
+  };
+
+  public query ({ caller }) func getTodaysOtherWork(currentDate : Date) : async [OtherWork] {
+    checkAnonymous(caller);
+    switch (otherWorkMap.get(caller)) {
+      case (null) { [] };
+      case (?list) {
+        list.filter(func(w) {
+          w.scheduledDate.day == currentDate.day and
+          w.scheduledDate.month == currentDate.month and
+          w.scheduledDate.year == currentDate.year
+        }).toArray();
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteOtherWork(workId : Nat) : async () {
+    checkAnonymous(caller);
+    switch (otherWorkMap.get(caller)) {
+      case (null) {};
+      case (?list) {
+        let arr = list.filter(func(w) { w.id != workId }).toArray();
+        let size = list.size();
+        var i = 0;
+        while (i < size) { ignore list.removeLast(); i += 1 };
+        for (item in arr.vals()) { list.add(item) };
+      };
+    };
+  };
+
+  public shared ({ caller }) func markOtherWorkAsDone(workId : Nat) : async () {
+    checkAnonymous(caller);
+    switch (otherWorkMap.get(caller)) {
+      case (null) { Runtime.trap("No other work found") };
+      case (?list) {
+        let arr = list.map<OtherWork, OtherWork>(func(w) {
+          if (w.id == workId) {
+            { id = w.id; plotName = w.plotName; workDescription = w.workDescription; scheduledDate = w.scheduledDate; notes = w.notes; isDone = true };
+          } else { w };
+        }).toArray();
+        let size = list.size();
+        var i = 0;
+        while (i < size) { ignore list.removeLast(); i += 1 };
+        for (item in arr.vals()) { list.add(item) };
+      };
+    };
+  };
+
+  // ---- Plot Share ----
+
   public type PlotShareData = {
     crops : [Crop];
     fertilizerSchedules : [FertilizerSchedule];
@@ -610,7 +713,6 @@ actor {
     let newCollaborators = List.empty<Principal>();
     for (c in plot.collaborators.vals()) { newCollaborators.add(c); };
     newCollaborators.add(collaborator);
-    // Update shared plot by removing old entry and adding updated one
     ignore sharedPlots.remove(sharedPlotId);
     sharedPlots.add(sharedPlotId, {
       id = plot.id;
@@ -642,7 +744,6 @@ actor {
     });
   };
 
-
   public shared ({ caller }) func deleteSharedPlot(sharedPlotId : Nat) : async () {
     checkAnonymous(caller);
     let plot = switch (sharedPlots.get(sharedPlotId)) {
@@ -651,7 +752,6 @@ actor {
     };
     if (plot.owner != caller) Runtime.trap("Only the owner can delete this shared plot");
     ignore sharedPlots.remove(sharedPlotId);
-    // Also remove associated schedules
     ignore sharedFertilizerSchedules.remove(sharedPlotId);
     ignore sharedSpraySchedules.remove(sharedPlotId);
   };
@@ -672,6 +772,7 @@ actor {
       collaborators = plot.collaborators;
     });
   };
+
   public query ({ caller }) func getMySharedPlots() : async [SharedPlot] {
     checkAnonymous(caller);
     let result = List.empty<SharedPlot>();

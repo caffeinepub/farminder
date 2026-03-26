@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Principal } from "@icp-sdk/core/principal";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Calendar, FlaskConical, Leaf, Wind } from "lucide-react";
+import farmLogo from "/assets/uploads/Screenshot_2026-03-19-17-53-17-36_40deb401b9ffe8e1df2f1cc5ba480b12-1.jpg";
 import type {
   FertilizerSchedule,
   SpraySchedule,
@@ -67,7 +68,7 @@ export default function SharePlotPage() {
       {/* Header */}
       <header className="py-4 px-5 flex items-center gap-3 border-b border-border bg-white/70 backdrop-blur-sm sticky top-0 z-10">
         <img
-          src="/assets/uploads/Screenshot_2026-03-19-17-53-17-36_40deb401b9ffe8e1df2f1cc5ba480b12-1.jpg"
+          src={farmLogo}
           alt="Farminder Logo"
           className="w-10 h-10 rounded-xl object-cover shadow-sm"
         />

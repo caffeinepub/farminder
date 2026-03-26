@@ -72,6 +72,15 @@ export const SharedPlotSchedules = IDL.Record({
   'spraySchedules' : IDL.Vec(SharedSpraySchedule),
 });
 
+export const OtherWork = IDL.Record({
+  'id' : IDL.Nat,
+  'plotName' : IDL.Text,
+  'workDescription' : IDL.Text,
+  'scheduledDate' : Date,
+  'notes' : IDL.Text,
+  'isDone' : IDL.Bool,
+});
+
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addCrop' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
@@ -154,6 +163,11 @@ export const idlService = IDL.Service({
   'getSharedPlotSchedules' : IDL.Func([IDL.Nat], [SharedPlotSchedules], ['query']),
   'deleteSharedPlot' : IDL.Func([IDL.Nat], [], []),
   'renameSharedPlot' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text], [], []),
+    'addOtherWork' : IDL.Func([IDL.Text, IDL.Text, Date, IDL.Text], [IDL.Nat], []),
+    'getAllOtherWork' : IDL.Func([], [IDL.Vec(OtherWork)], ['query']),
+    'getTodaysOtherWork' : IDL.Func([Date], [IDL.Vec(OtherWork)], ['query']),
+    'deleteOtherWork' : IDL.Func([IDL.Nat], [], []),
+    'markOtherWorkAsDone' : IDL.Func([IDL.Nat], [], []),
 });
 
 export const idlInitArgs = [];
@@ -313,6 +327,11 @@ export const idlFactory = ({ IDL }) => {
     'getSharedPlotSchedules' : IDL.Func([IDL.Nat], [SharedPlotSchedules], ['query']),
     'deleteSharedPlot' : IDL.Func([IDL.Nat], [], []),
     'renameSharedPlot' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text], [], []),
+    'addOtherWork' : IDL.Func([IDL.Text, IDL.Text, Date, IDL.Text], [IDL.Nat], []),
+    'getAllOtherWork' : IDL.Func([], [IDL.Vec(OtherWork)], ['query']),
+    'getTodaysOtherWork' : IDL.Func([Date], [IDL.Vec(OtherWork)], ['query']),
+    'deleteOtherWork' : IDL.Func([IDL.Nat], [], []),
+    'markOtherWorkAsDone' : IDL.Func([IDL.Nat], [], []),
   });
 };
 

@@ -1,8 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
-import { CalendarDays, Layers, Menu, Package, X } from "lucide-react";
+import {
+  Briefcase,
+  CalendarDays,
+  Layers,
+  Menu,
+  Package,
+  X,
+} from "lucide-react";
 import { useState } from "react";
+import farmLogo from "/assets/uploads/Screenshot_2026-03-19-17-53-17-36_40deb401b9ffe8e1df2f1cc5ba480b12-1.jpg";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 const NAV_LINKS = [
@@ -11,6 +19,7 @@ const NAV_LINKS = [
   { label: "Plots", to: "/plots", icon: Layers },
   { label: "Calendar", to: "/calendar", icon: CalendarDays },
   { label: "Materials", to: "/materials", icon: Package },
+  { label: "Other Work", to: "/other-work", icon: Briefcase },
 ];
 
 export default function Header() {
@@ -44,9 +53,9 @@ export default function Header() {
       <div className="container mx-auto px-4 flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2 group">
           <img
-            src="/assets/uploads/Screenshot_2026-03-19-17-53-17-36_40deb401b9ffe8e1df2f1cc5ba480b12-1.jpg"
+            src={farmLogo}
             alt="Farminder Logo"
-            className="w-9 h-9 object-contain rounded-full"
+            className="w-10 h-10 object-contain rounded-full"
           />
           <span className="font-display font-bold text-xl text-foreground">
             Farminder

@@ -1,17 +1,22 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
+  Check,
   ChevronLeft,
   ChevronRight,
   FlaskConical,
+  Loader2,
   MapPin,
   Package,
+  Trash2,
   Users,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { useActor } from "../hooks/useActor";
 import {
   useGetFertilizerSchedulesForMonth,
@@ -55,6 +60,10 @@ export default function MaterialsPage() {
   const today = new Date();
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+
+  const queryClient = useQueryClient();
 
   const { data: fertilizers, isLoading: fertLoading } =
     useGetFertilizerSchedulesForMonth(selectedMonth, selectedYear);
@@ -178,8 +187,92 @@ export default function MaterialsPage() {
 
   items.sort((a, b) => a.day - b.day);
 
+  // Filter out locally deleted items
+  const visibleItems = items.filter((item) => !deletedIds.has(item.id));
+
   const isLoading =
     fertLoading || sprayLoading || sharedPlotsLoading || sharedSchedulesLoading;
+
+  const setItemLoading = (id: string, loading: boolean) => {
+    setLoadingIds((prev) => {
+      const next = new Set(prev);
+      if (loading) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["fertilizerSchedules"] });
+    queryClient.invalidateQueries({ queryKey: ["spraySchedules"] });
+    queryClient.invalidateQueries({ queryKey: ["sharedPlotSchedules"] });
+  };
+
+  const handleMarkDone = async (item: MaterialItem) => {
+    if (!actor) return;
+    setItemLoading(item.id, true);
+    try {
+      if (item.id.startsWith("f-")) {
+        const numId = BigInt(item.id.slice(2));
+        await actor.markFertilizerScheduleAsDone(numId);
+        await actor.deleteFertilizerSchedule(numId);
+      } else if (item.id.startsWith("s-")) {
+        const numId = BigInt(item.id.slice(2));
+        await actor.markSprayScheduleAsDone(numId);
+        await actor.deleteSpraySchedule(numId);
+      } else if (item.id.startsWith("sf-")) {
+        const parts = item.id.split("-");
+        const plotId = BigInt(parts[1]);
+        const scheduleId = BigInt(parts[2]);
+        await (actor as any).deleteSharedFertilizerSchedule(plotId, scheduleId);
+      } else if (item.id.startsWith("ss-")) {
+        const parts = item.id.split("-");
+        const plotId = BigInt(parts[1]);
+        const scheduleId = BigInt(parts[2]);
+        await (actor as any).deleteSharedSpraySchedule(plotId, scheduleId);
+      }
+      setDeletedIds((prev) => new Set(prev).add(item.id));
+      invalidateAll();
+      toast.success(`${item.name} marked as done and removed.`);
+    } catch (err) {
+      console.error(err);
+      toast.error(`Failed to mark ${item.name} as done.`);
+    } finally {
+      setItemLoading(item.id, false);
+    }
+  };
+
+  const handleDelete = async (item: MaterialItem) => {
+    if (!actor) return;
+    setItemLoading(item.id, true);
+    try {
+      if (item.id.startsWith("f-")) {
+        await actor.deleteFertilizerSchedule(BigInt(item.id.slice(2)));
+      } else if (item.id.startsWith("s-")) {
+        await actor.deleteSpraySchedule(BigInt(item.id.slice(2)));
+      } else if (item.id.startsWith("sf-")) {
+        const parts = item.id.split("-");
+        await (actor as any).deleteSharedFertilizerSchedule(
+          BigInt(parts[1]),
+          BigInt(parts[2]),
+        );
+      } else if (item.id.startsWith("ss-")) {
+        const parts = item.id.split("-");
+        await (actor as any).deleteSharedSpraySchedule(
+          BigInt(parts[1]),
+          BigInt(parts[2]),
+        );
+      }
+      setDeletedIds((prev) => new Set(prev).add(item.id));
+      invalidateAll();
+      toast.success(`${item.name} deleted.`);
+    } catch (err) {
+      console.error(err);
+      toast.error(`Failed to delete ${item.name}.`);
+    } finally {
+      setItemLoading(item.id, false);
+    }
+  };
 
   const goToPrevMonth = () => {
     if (selectedMonth === 1) {
@@ -247,21 +340,24 @@ export default function MaterialsPage() {
       </div>
 
       {/* Summary pill */}
-      {!isLoading && items.length > 0 && (
+      {!isLoading && visibleItems.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-6">
           <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-green-50 text-green-700 border border-green-200">
             <span className="w-2 h-2 rounded-full bg-green-500" />
-            {items.filter((i) => i.type === "Fertilizer").length} Fertilizer
-            {items.filter((i) => i.type === "Fertilizer").length !== 1
+            {visibleItems.filter((i) => i.type === "Fertilizer").length}{" "}
+            Fertilizer
+            {visibleItems.filter((i) => i.type === "Fertilizer").length !== 1
               ? "s"
               : ""}
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
             <span className="w-2 h-2 rounded-full bg-blue-500" />
-            {items.filter((i) => i.type === "Spray").length} Spray
-            {items.filter((i) => i.type === "Spray").length !== 1 ? "s" : ""}
+            {visibleItems.filter((i) => i.type === "Spray").length} Spray
+            {visibleItems.filter((i) => i.type === "Spray").length !== 1
+              ? "s"
+              : ""}
           </span>
-          {items.some((i) => i.isShared) && (
+          {visibleItems.some((i) => i.isShared) && (
             <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
               <Users className="w-3 h-3" />
               Includes shared plots
@@ -291,7 +387,7 @@ export default function MaterialsPage() {
       )}
 
       {/* Empty state */}
-      {!isLoading && items.length === 0 && (
+      {!isLoading && visibleItems.length === 0 && (
         <div
           data-ocid="materials.empty_state"
           className="flex flex-col items-center justify-center py-20 text-center"
@@ -317,12 +413,13 @@ export default function MaterialsPage() {
       )}
 
       {/* 3-column grid */}
-      {!isLoading && items.length > 0 && (
+      {!isLoading && visibleItems.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((item, idx) => {
+          {visibleItems.map((item, idx) => {
             const isFert = item.type === "Fertilizer";
             const isPast = item.isDone;
             const displayQty = item.quantity || item.notes;
+            const isItemLoading = loadingIds.has(item.id);
 
             return (
               <motion.div
@@ -330,6 +427,7 @@ export default function MaterialsPage() {
                 data-ocid={`materials.item.${idx + 1}`}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.3, delay: idx * 0.04 }}
                 className={`relative rounded-xl border bg-card shadow-sm p-5 flex flex-col gap-3 transition-opacity ${
                   isPast ? "opacity-70" : ""
@@ -412,6 +510,55 @@ export default function MaterialsPage() {
                     </span>
                   </div>
                 )}
+
+                {/* Action buttons */}
+                <div className="mt-auto pt-2 flex gap-2">
+                  {isPast ? (
+                    // Already done: show Done badge + delete button
+                    <>
+                      <span className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1">
+                        <Check className="w-3 h-3" />
+                        Done
+                      </span>
+                      <Button
+                        data-ocid={`materials.delete_button.${idx + 1}`}
+                        size="sm"
+                        variant="ghost"
+                        className="ml-auto h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDelete(item)}
+                        disabled={isItemLoading}
+                        aria-label="Delete item"
+                      >
+                        {isItemLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    // Not done: show Mark Done button
+                    <Button
+                      data-ocid={`materials.confirm_button.${idx + 1}`}
+                      size="sm"
+                      className="w-full gap-2 text-white font-semibold rounded-lg"
+                      style={{
+                        background: isItemLoading
+                          ? "oklch(0.72 0.14 140)"
+                          : "oklch(0.55 0.18 140)",
+                      }}
+                      onClick={() => handleMarkDone(item)}
+                      disabled={isItemLoading}
+                    >
+                      {isItemLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
+                      {isItemLoading ? "Processing..." : "Mark Done"}
+                    </Button>
+                  )}
+                </div>
               </motion.div>
             );
           })}

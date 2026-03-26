@@ -565,6 +565,32 @@ export class Backend implements backendInterface {
         } else { return await this.actor.renameSharedPlot(arg0, arg1, arg2); }
     }
 
+    async addOtherWork(arg0, arg1, arg2, arg3) {
+        if (this.processError) {
+            try { return await this.actor.addOtherWork(arg0, arg1, arg2, arg3); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.addOtherWork(arg0, arg1, arg2, arg3); }
+    }
+    async getAllOtherWork() {
+        if (this.processError) {
+            try { return await this.actor.getAllOtherWork(); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.getAllOtherWork(); }
+    }
+    async getTodaysOtherWork(arg0) {
+        if (this.processError) {
+            try { return await this.actor.getTodaysOtherWork(arg0); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { return await this.actor.getTodaysOtherWork(arg0); }
+    }
+    async deleteOtherWork(arg0) {
+        if (this.processError) {
+            try { await this.actor.deleteOtherWork(arg0); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { await this.actor.deleteOtherWork(arg0); }
+    }
+    async markOtherWorkAsDone(arg0) {
+        if (this.processError) {
+            try { await this.actor.markOtherWorkAsDone(arg0); } catch (e) { this.processError(e); throw new Error("unreachable"); }
+        } else { await this.actor.markOtherWorkAsDone(arg0); }
+    }
+
 }
 function from_candid_UserRole_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
     return from_candid_variant_n5(_uploadFile, _downloadFile, value);
