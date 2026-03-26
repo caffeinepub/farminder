@@ -26,11 +26,12 @@ export function useActor() {
       };
 
       const actor = await createActorWithConfig(actorOptions);
-      const adminToken = getSecretParameter("caffeineAdminToken") || "";
       try {
+        const adminToken = getSecretParameter("caffeineAdminToken") || "";
         await actor._initializeAccessControlWithSecret(adminToken);
-      } catch (e) {
-        console.warn("Access control initialization failed (non-fatal):", e);
+      } catch (_e) {
+        // Access control initialization is optional; ignore errors so the actor
+        // is always returned and operations like addPlot/addWork can proceed.
       }
       return actor;
     },
