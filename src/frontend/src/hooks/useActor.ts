@@ -26,12 +26,13 @@ export function useActor() {
       };
 
       const actor = await createActorWithConfig(actorOptions);
-      // Wrap access control initialization in try-catch so it NEVER blocks actor creation
+      // Always wrap access control init in try-catch so actor is always returned
+      // even if the initialization step fails (e.g. unauthorized, network error)
       try {
         const adminToken = getSecretParameter("caffeineAdminToken") || "";
         await actor._initializeAccessControlWithSecret(adminToken);
-      } catch (_e) {
-        // Access control init failure is non-fatal; actor still works
+      } catch (e) {
+        console.warn("Access control initialization failed (non-fatal):", e);
       }
       return actor;
     },
