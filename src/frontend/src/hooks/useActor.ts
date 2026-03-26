@@ -26,12 +26,12 @@ export function useActor() {
       };
 
       const actor = await createActorWithConfig(actorOptions);
-      const adminToken = getSecretParameter("caffeineAdminToken") || "";
+      // Wrap access control init in try-catch so it never blocks actor creation
       try {
+        const adminToken = getSecretParameter("caffeineAdminToken") || "";
         await actor._initializeAccessControlWithSecret(adminToken);
       } catch (_e) {
-        // Access control init failed, but actor is still usable
-        console.warn("Access control init skipped:", _e);
+        // Ignore – actor still usable without access control initialization
       }
       return actor;
     },
@@ -39,7 +39,6 @@ export function useActor() {
     staleTime: Number.POSITIVE_INFINITY,
     // This will cause the actor to be recreated when the identity changes
     enabled: true,
-    retry: 2,
   });
 
   // When the actor changes, invalidate dependent queries
