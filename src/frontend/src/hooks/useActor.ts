@@ -26,12 +26,12 @@ export function useActor() {
       };
 
       const actor = await createActorWithConfig(actorOptions);
-      // Wrap in try-catch so access control init failures never block actor creation
+      // Wrap access control initialization in try-catch so it NEVER blocks actor creation
       try {
         const adminToken = getSecretParameter("caffeineAdminToken") || "";
         await actor._initializeAccessControlWithSecret(adminToken);
       } catch (_e) {
-        // Ignore -- non-admin users will always fail this call, actor is still usable
+        // Access control init failure is non-fatal; actor still works
       }
       return actor;
     },
