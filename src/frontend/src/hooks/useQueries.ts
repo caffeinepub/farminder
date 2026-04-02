@@ -1,3 +1,4 @@
+import type { Principal } from "@dfinity/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useActor } from "./useActor";
 
@@ -305,7 +306,7 @@ export function useInviteCollaborator() {
     mutationFn: ({
       sharedPlotId,
       collaborator,
-    }: { sharedPlotId: bigint; collaborator: any }) =>
+    }: { sharedPlotId: bigint; collaborator: Principal }) =>
       (actor as any).inviteCollaborator(sharedPlotId, collaborator),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sharedPlots"] });

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Principal } from "@dfinity/principal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Briefcase,
@@ -826,21 +827,42 @@ function SharedPlotCard({
   const isOwner = plot.owner?.toText?.() === myPrincipal;
 
   const handleInvite = async () => {
-    if (!invitePrincipal.trim()) {
-      toast.error("Enter a Principal ID");
+    const trimmedId = invitePrincipal.trim();
+    if (!trimmedId) {
+      toast.error("Enter a Farmer ID");
+      return;
+    }
+    // Validate Principal format before sending to backend
+    let collaboratorPrincipal: Principal;
+    try {
+      collaboratorPrincipal = Principal.fromText(trimmedId);
+    } catch {
+      toast.error(
+        "Invalid Farmer ID format. Please copy the exact ID shown in the other farmer's app.",
+      );
       return;
     }
     try {
-      // We pass the principal string; backend accepts Principal type
       await invite({
         sharedPlotId: plot.id,
-        collaborator: invitePrincipal.trim(),
+        collaborator: collaboratorPrincipal,
       });
       setInvitePrincipal("");
       setShowInvite(false);
-      toast.success("Farmer invited!");
-    } catch {
-      toast.error("Failed to invite farmer");
+      toast.success("Farmer invited successfully!");
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      if (msg.includes("Already a collaborator")) {
+        toast.error("This farmer is already a collaborator on this plot.");
+      } else if (msg.includes("Shared plot not found")) {
+        toast.error("Shared plot not found. Please refresh and try again.");
+      } else if (msg.includes("Only the owner")) {
+        toast.error("Only the plot owner can invite collaborators.");
+      } else {
+        toast.error(
+          "Unable to invite farmer. Please check the Farmer ID and try again.",
+        );
+      }
     }
   };
 
@@ -1043,8 +1065,9 @@ function SharedPlotCard({
                   Invite a Farmer
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Enter the farmer's Principal ID (they can find it in the
-                  Shared Plots page header).
+                  Ask the other farmer to open the Shared Plots tab and copy
+                  their <strong>Farmer ID</strong> shown at the top. Paste it
+                  here exactly.
                 </p>
                 <div className="flex gap-2">
                   <Input
